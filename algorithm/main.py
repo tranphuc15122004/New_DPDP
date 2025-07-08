@@ -6,7 +6,8 @@ from algorithm.Object import *
 from algorithm.engine import *
 from algorithm.Main_algorithm.GA import GA ,  GA1LS , GA5LS
 from algorithm.Main_algorithm.ACO import ACO
-
+from algorithm.Test_algorithm.new_engine import *
+from algorithm.Test_algorithm.new_GA import new_GA
 
 
 input_directory = r'algorithm\data_interaction'
@@ -30,11 +31,11 @@ def main():
     if over24hours(id_to_vehicle , new_order_itemIDs):
         redispatch_process(id_to_vehicle , route_map , vehicleid_to_plan , id_to_factory , id_to_unlocated_items)
     else:
-        dispatch_new_orders(vehicleid_to_plan , id_to_factory , route_map , id_to_vehicle , id_to_unlocated_items , new_order_itemIDs)
+        new_dispatch_new_orders(vehicleid_to_plan , id_to_factory , route_map , id_to_vehicle , id_to_unlocated_items , new_order_itemIDs)
     
     Unongoing_super_nodes , Base_vehicleid_to_plan= get_UnongoingSuperNode(vehicleid_to_plan , id_to_vehicle)
     
-    best_chromosome : Chromosome =  GA5LS(vehicleid_to_plan , route_map , id_to_vehicle ,  Unongoing_super_nodes  ,Base_vehicleid_to_plan)
+    best_chromosome : Chromosome =  new_GA(vehicleid_to_plan , route_map , id_to_vehicle ,  Unongoing_super_nodes  ,Base_vehicleid_to_plan)
     if best_chromosome is None or best_chromosome.fitness > total_cost(id_to_vehicle , route_map , vehicleid_to_plan):
         best_chromosome = Chromosome(vehicleid_to_plan , route_map , id_to_vehicle)
     

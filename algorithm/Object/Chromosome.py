@@ -65,6 +65,7 @@ def mutate_solution(indivisual : Chromosome , is_limited = False , is_1LS : bool
             if block_relocate(indivisual.solution , indivisual.id_to_vehicle , indivisual.route_map , is_limited):
                 is_improved = True
                 n3 +=1
+            
             if multi_pd_group_relocate(indivisual.solution , indivisual.id_to_vehicle , indivisual.route_map , is_limited):
                 n4 +=1
                 is_improved = True

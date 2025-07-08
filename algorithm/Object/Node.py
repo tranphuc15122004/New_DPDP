@@ -32,8 +32,10 @@ class Node:
         # Tính toán thời gian phục vụ
         loading_time = 0
         unloading_time = 0
-        for item in self.delivery_item_list:
+        for item in self.pickup_item_list:
             loading_time += item.load_time 
+        
+        for item in self.delivery_item_list:
             unloading_time += item.unload_time
         return loading_time + unloading_time
 

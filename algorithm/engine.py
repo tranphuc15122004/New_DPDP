@@ -1400,6 +1400,7 @@ def single_vehicle_cost(route_node_list: List[Node] , vehicle:Vehicle , route_ma
     
     if curr_factoryID is not None and len(curr_factoryID) > 0:
         utilTime = vehicle.leave_time_at_current_factory
+        
         for next_node in route_node_list:
             next_factoryID = next_node.id
             distance = 0
@@ -1434,6 +1435,7 @@ def single_vehicle_cost(route_node_list: List[Node] , vehicle:Vehicle , route_ma
                 if (before_orderID != next_orderID):
                     overtime_sum += max(0 , utilTime - orderitem.committed_completion_time)
                 before_orderID = next_orderID
+        
         for next_node in route_node_list[1:]:
             next_factoryID = next_node.id
             distance = 0
