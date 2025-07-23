@@ -267,7 +267,7 @@ def generate_random_chromosome(initial_vehicleid_to_plan : Dict[str , List[Node]
         # Chen ngau nhien cac super node vao cac lo trinh cua cac xe 
         for DPG in pdg_Map.values():
             # Khai bao cac bien lien quan
-            # chen theo cách tốt nhất
+            # chen vao sau cac tuyen duong
             if random.uniform(0 , 1) <= 0.25:
                 isExhausive = False
                 route_node_list : List[Node] = []
@@ -290,7 +290,13 @@ def generate_random_chromosome(initial_vehicleid_to_plan : Dict[str , List[Node]
                     route_node_list.insert(bestInsertPosJ, new_order_delivery_node)
                 temp_route[bestInsertVehicleID] = route_node_list
             else:
-                random_dispatch_nodePair(DPG , id_to_vehicle , temp_route)
+                if random.uniform(0 , 1) <= 0.5:
+                    selected_vehicleID = random.choice(list(id_to_vehicle.keys()))
+                    selected_vehicle = id_to_vehicle[selected_vehicleID]
+                    
+                    temp_route[selected_vehicleID].extend(DPG)
+                else:
+                    random_dispatch_nodePair(DPG , id_to_vehicle , temp_route)
                 
         # Da tao xong mot ca the moi
         if len(temp_route) == len(id_to_vehicle):

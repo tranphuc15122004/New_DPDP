@@ -4,7 +4,7 @@ import sys
 import time
 from typing import Dict, List, Optional, Tuple
 from algorithm.Object import *
-from algorithm.algorithm_config import APPROACHING_DOCK_TIME, LS_MAX
+from algorithm.algorithm_config import *
 from algorithm.engine import dispatch_nodePair, total_cost
 from algorithm.local_search import *
 
@@ -29,6 +29,7 @@ class Chromosome:
 
     def crossover(self, other: 'Chromosome' , PDG_map : Dict[str , List[Node]]) -> 'Chromosome':
         child_solution = crossover_solutions(self, other  , PDG_map)
+        child_solution.fitness = child_solution.evaluate_fitness()
         return child_solution
 
     def __repr__(self):
@@ -37,7 +38,6 @@ class Chromosome:
 def mutate_solution(indivisual : Chromosome , is_limited = False , is_1LS : bool = False):
     if is_1LS:
         n1 = 0
-        begin_time = time.time()
         i  = 1
         while i < LS_MAX:
             is_improved = False
@@ -51,9 +51,12 @@ def mutate_solution(indivisual : Chromosome , is_limited = False , is_1LS : bool
             print(f"PDPairExchange:{n1}; cost:{total_cost(indivisual.id_to_vehicle , indivisual.route_map , indivisual.solution ):.2f}" , file= sys.stderr  )
     else:
         n1 , n2 , n3 , n4, n5 = 0 ,0 ,0 ,0 ,0
-        begin_time = time.time()
         i  = 1
         while i < LS_MAX:
+            curr_time = time.time()
+            if curr_time - BEGIN_TIME > 60:
+                break
+            
             is_improved = False
             if inter_couple_exchange(indivisual.solution , indivisual.id_to_vehicle , indivisual.route_map , is_limited):
                 n1 +=1
@@ -70,7 +73,7 @@ def mutate_solution(indivisual : Chromosome , is_limited = False , is_1LS : bool
                 n4 +=1
                 is_improved = True
             
-            if improve_ci_path_by_2_opt(indivisual.solution , indivisual.id_to_vehicle , indivisual.route_map , begin_time , is_limited):
+            if improve_ci_path_by_2_opt(indivisual.solution , indivisual.id_to_vehicle , indivisual.route_map  , is_limited):
                 n5 +=1
                 is_improved = True
             
@@ -82,9 +85,12 @@ def mutate_solution(indivisual : Chromosome , is_limited = False , is_1LS : bool
 
 def mutation_for_ACO(indivisual : Chromosome , is_limited = False):
     n1 , n2 , n3 , n4, n5 = 0 ,0 ,0 ,0 ,0
-    begin_time = time.time()
     i  = 1
     while True:
+        curr_time = time.time()
+        if curr_time - BEGIN_TIME > 60:
+            break
+        
         is_improved = False
         if inter_couple_exchange(indivisual.solution , indivisual.id_to_vehicle , indivisual.route_map , is_limited):
             n1 +=1
@@ -105,7 +111,7 @@ def mutation_for_ACO(indivisual : Chromosome , is_limited = False):
             is_improved = True
             continue
             
-        if improve_ci_path_by_2_opt(indivisual.solution , indivisual.id_to_vehicle , indivisual.route_map , begin_time , is_limited):
+        if improve_ci_path_by_2_opt(indivisual.solution , indivisual.id_to_vehicle , indivisual.route_map  , is_limited):
             n5 +=1
             is_improved = True
             continue

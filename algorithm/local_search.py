@@ -4,12 +4,15 @@ from typing import Dict , List
 import copy
 import time
 from algorithm.Object import Node, Vehicle, OrderItem
-from algorithm.algorithm_config import *
+import algorithm.algorithm_config as config
 from algorithm.engine import *
 from algorithm.local_search import * 
 
 
 def inter_couple_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple] , is_limited : bool = False ):    
+    if time.time() - config.BEGIN_TIME > config.ALGO_TIME_LIMIT:
+        return False
+    
     is_improved = False
 
     dis_order_super_node , _ = get_UnongoingSuperNode(vehicleid_to_plan , id_to_vehicle)
@@ -181,6 +184,9 @@ def inter_couple_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehic
     return is_improved
 
 def block_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple] , is_limited : bool = False):
+    if time.time() - config.BEGIN_TIME > config.ALGO_TIME_LIMIT:
+        return False
+    
     is_improved = False
     dis_order_super_node , _ = get_UnongoingSuperNode(vehicleid_to_plan , id_to_vehicle)
     
@@ -360,6 +366,9 @@ def block_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dic
 
 
 def block_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple] , is_limited: bool = False ):
+    if time.time() - config.BEGIN_TIME > config.ALGO_TIME_LIMIT:
+        return False
+    
     is_improved = False
     dis_order_super_node ,_ = get_UnongoingSuperNode(vehicleid_to_plan , id_to_vehicle)
     ls_node_pair_num = len(dis_order_super_node)
@@ -457,6 +466,9 @@ def block_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dic
     return is_improved
 
 def multi_pd_group_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple] , is_limited : bool = False):
+    if time.time() - config.BEGIN_TIME > config.ALGO_TIME_LIMIT:
+        return False
+    
     is_improved = False
     cp_vehicle_id2_planned_route : Dict [str , List [Node]]= {}
     for key , value in vehicleid_to_plan.items():
@@ -587,7 +599,10 @@ def multi_pd_group_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to_veh
     return is_improved
 
 
-def improve_ci_path_by_2_opt(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple] , begintime , is_limited : bool = False):
+def improve_ci_path_by_2_opt(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple]  , is_limited : bool = False):
+    if time.time() - config.BEGIN_TIME > config.ALGO_TIME_LIMIT:
+        return False
+    
     is_improved = False
     cost0 = total_cost(id_to_vehicle , route_map , vehicleid_to_plan)
     
@@ -689,7 +704,7 @@ def improve_ci_path_by_2_opt(vehicleid_to_plan: Dict[str , List[Node]], id_to_ve
         if is_improved and is_route_improved and is_limited:
             break
         endtime = time.time()
-        usedtime = (endtime - begintime)
+        usedtime = (endtime - config.BEGIN_TIME)
         if usedtime > 9 * 60:
             print("TimeOut !!!!!!!!!!!!!!" )
             return is_improved

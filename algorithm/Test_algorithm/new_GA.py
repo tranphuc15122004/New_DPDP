@@ -1,85 +1,127 @@
 from typing import Dict , List , Tuple 
 from algorithm.Object import *
-from algorithm.algorithm_config import *    
+import algorithm.algorithm_config as config 
 import random
 from algorithm.engine import *
 from algorithm.Test_algorithm.new_LS import *
 from algorithm.Test_algorithm.new_engine import *
 
 
-def new_GA(initial_vehicleid_to_plan : Dict[str , List[Node]] ,route_map: Dict[Tuple, Tuple], id_to_vehicle: Dict[str, Vehicle] ,Unongoing_super_nodes : Dict[int , Dict[str, Node]] , Base_vehicleid_to_plan : Dict[str , List[Node]]) -> Chromosome:
-    population : List[Chromosome] = []
-    PDG_map : Dict[str , List[Node]] = {}
-    population ,  PDG_map = generate_random_chromosome(initial_vehicleid_to_plan , route_map , id_to_vehicle , Unongoing_super_nodes , Base_vehicleid_to_plan  , POPULATION_SIZE)
-
+def new_GA(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tuple, Tuple], 
+            id_to_vehicle: Dict[str, Vehicle], Unongoing_super_nodes: Dict[int, Dict[str, Node]], 
+            Base_vehicleid_to_plan: Dict[str, List[Node]]) -> Chromosome:
+    
+    population, PDG_map = generate_random_chromosome(initial_vehicleid_to_plan, route_map, id_to_vehicle, Unongoing_super_nodes, Base_vehicleid_to_plan, config.POPULATION_SIZE)
 
     if population is None:
         print('Cant initialize the population')
         return None
-    
-    """ print()
-    print(len(PDG_map))
-    print(get_route_after(Base_vehicleid_to_plan , {})) """
-
-    best_solution : Chromosome = None
-    stagnant_generations = 0  # Biến đếm số thế hệ không cải thiện
-    time_of_1_gen = 0
-    population.sort(key= lambda x: x.fitness)
+    best_solution: Chromosome = None
+    stagnant_generations = 0
+    population.sort(key=lambda x: x.fitness)
     best_solution = population[0]
-    begintime = time.time()
     
-    for gen in range(NUMBER_OF_GENERATION):
+    # Elite size
+    elite_size = max(2, config.POPULATION_SIZE // 5)
+    
+    for gen in range(config.NUMBER_OF_GENERATION):
+        gen_start_time = time.time()  # Bắt đầu generation
+        
         new_population = []
+        
+        # Elitism - giữ lại elite
+        population.sort(key=lambda x: x.fitness)
+        new_population = population[:elite_size]
 
-        while len(new_population) < POPULATION_SIZE:
+        # Tạo con
+        while len(new_population) < config.POPULATION_SIZE:
             parent1, parent2 = select_parents(population)
             child = parent1.crossover(parent2, PDG_map)
             new_population.append(child)
-        # Sắp xếp lại quần thể và lấy 20 cá thể tốt nhất
-        population.extend(new_population)
-        population.sort(key=lambda x: x.fitness)
-        population = population[:POPULATION_SIZE]
 
+        population = new_population
+        
         for c in population:
-            if random.uniform(0 , 1) <= MUTATION_RATE:
-                c.mutate(True , False)
+            if random.uniform(0, 1) <= config.MUTATION_RATE:
+                c.mutate(True, False)
 
-        # Sắp xếp lại quần thể sau đột biến
+        # Duy trì đa dạng mỗi thế hệ
+        population = maintain_diversity(population, id_to_vehicle, route_map, Base_vehicleid_to_plan, PDG_map)
+
+        # Sắp xếp lại quần thể
         population.sort(key=lambda x: x.fitness)
 
-        # Cập nhật giải pháp tốt nhất từ quần thể đã đột biến
+        # Cập nhật best solution
         if best_solution is None or population[0].fitness < best_solution.fitness:
             best_solution = population[0]
             stagnant_generations = 0
         else:
             stagnant_generations += 1
 
-        # Điều kiện dừng sớm nếu không có cải thiện
+        # Điều kiện dừng
         if stagnant_generations >= 10:
             print("Stopping early due to lack of improvement.")
             break
 
-        endtime = time.time()
-        if time_of_1_gen == 0:
-            time_of_1_gen = endtime - begintime
-        used_time = endtime - begintime + time_of_1_gen
-        if used_time > 10 * 60:
-            print("TimeOut!!")
+        # Time check - Điều chỉnh
+        gen_end_time = time.time()
+        current_gen_duration = gen_end_time - gen_start_time
+        
+        # Tính thời gian của generation đầu tiên
+        if gen == 0:
+            first_gen_time = current_gen_duration
+        
+        # Tính tổng thời gian đã sử dụng
+        elapsed_time = gen_end_time - config.BEGIN_TIME
+        
+        # Ước tính thời gian cần cho generation tiếp theo
+        avg_gen_time = elapsed_time / (gen + 1)
+        estimated_next_gen_time = avg_gen_time
+        
+        # Kiểm tra timeout
+        if elapsed_time + estimated_next_gen_time > config.ALGO_TIME_LIMIT:
+            print(f"TimeOut!! Elapsed: {elapsed_time:.1f}s, Estimated next gen: {estimated_next_gen_time:.1f}s")
             break
         
-        for c in population:
-            print(get_route_after(c.solution , {})  , file= sys.stderr)
-        #print(f'Generation {gen+1}: Best Fitness = {best_solution.fitness}')
-        print(f'Generation {gen+1}: Best fittness = {best_solution.fitness} , Worst fittness = {population[-1].fitness} , Average = {sum([c.fitness for c in population]) / len(population)}')
+        # Tính và in diversity
+        diversity = calculate_diversity(population)
+        fitness_diversity = calculate_fitness_diversity(population)
+        
+        print(f'Generation {gen+1}: Best = {best_solution.fitness:.2f}, '
+            f'Worst = {population[-1].fitness:.2f}, '
+            f'Avg = {sum([c.fitness for c in population]) / len(population):.2f}, '
+            f'Diversity = {diversity:.3f}, '
+            f'FitDiv = {fitness_diversity:.3f}')
+
+    final_time = time.time()
+    total_runtime = final_time - config.BEGIN_TIME
+    print(f"Total runtime: {total_runtime:.2f}s ({total_runtime/60:.1f} minutes)" )
     return best_solution
 
-# Chọn lọc cha mẹ bằng phương pháp tournament selection
 def select_parents(population: List[Chromosome]) -> Tuple[Chromosome, Chromosome]:
     def tournament_selection():
-        tournament_size = max(2, len(population) // 10)
+        # Tăng tournament size để tăng selective pressure
+        tournament_size = max(3, len(population) // 5)  # Tăng từ //10 lên //5
         candidates = random.sample(population, tournament_size)
         return min(candidates, key=lambda x: x.fitness)
-    return tournament_selection(), tournament_selection()
+    
+    def roulette_wheel_selection():
+        # Thêm roulette wheel selection để tăng đa dạng
+        fitness_values = [1 / (c.fitness + 1) for c in population]  # Inverse fitness
+        total_fitness = sum(fitness_values)
+        r = random.uniform(0, total_fitness)
+        cumulative = 0
+        for i, fitness in enumerate(fitness_values):
+            cumulative += fitness
+            if cumulative >= r:
+                return population[i]
+        return population[-1]
+    
+    # Kết hợp cả 2 phương pháp
+    if random.random() < 0.5:
+        return tournament_selection(), tournament_selection()
+    else:
+        return roulette_wheel_selection(), roulette_wheel_selection()
 
 def generate_random_chromosome(initial_vehicleid_to_plan : Dict[str , List[Node]],  route_map: Dict[Tuple, Tuple], id_to_vehicle: Dict[str, Vehicle], Unongoing_super_nodes : Dict[int , Dict[str, Node]]  ,Base_vehicleid_to_plan : Dict[str , List[Node]] , quantity : int):
     ls_node_pair_num = len(Unongoing_super_nodes)
@@ -176,3 +218,206 @@ def generate_random_chromosome(initial_vehicleid_to_plan : Dict[str , List[Node]
                 population.append(Chromosome(temp_route , route_map , id_to_vehicle ))
     population.append(Chromosome(initial_vehicleid_to_plan , route_map , id_to_vehicle))
     return population , pdg_Map 
+
+def new_mutation(indivisual: Chromosome, is_limited=False):
+    i = 1
+    
+    # Dictionary các phương pháp Local Search
+    methods = {
+        'PDPairExchange': lambda: inter_couple_exchange(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
+        'BlockExchange': lambda: block_exchange(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
+        'BlockRelocate': lambda: block_relocate(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
+        'mPDG': lambda: multi_pd_group_relocate(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
+        '2opt': lambda: improve_ci_path_by_2_opt(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited)
+    }
+    
+    # Counter cho từng phương pháp
+    counters = {name: 0 for name in methods.keys()}
+    
+    while True:
+        is_improved = False
+        
+        # Lấy danh sách tên phương pháp và trộn ngẫu nhiên cho mỗi iteration
+        method_names = list(methods.keys())
+        random.shuffle(method_names)
+        
+        # Thực hiện tuần tự tất cả các phương pháp theo thứ tự đã trộn
+        for method_name in method_names:
+            method_improved = True
+            
+            # Nếu phương pháp này cải thiện được, tiếp tục thực hiện nó cho đến khi không cải thiện được nữa
+            while method_improved:
+                method_improved = False
+                
+                if methods[method_name]():
+                    counters[method_name] += 1
+                    method_improved = True
+                    is_improved = True
+        
+        if is_improved:
+            i += 1
+        else:
+            break
+    indivisual.fitness = indivisual.evaluate_fitness()
+    print(f"PDPairExchange:{counters['PDPairExchange']}; BlockExchange:{counters['BlockExchange']}; BlockRelocate:{counters['BlockRelocate']}; mPDG:{counters['mPDG']}; 2opt:{counters['2opt']}; cost:{total_cost(indivisual.id_to_vehicle, indivisual.route_map, indivisual.solution):.2f}", file=sys.stderr)
+        
+def calculate_diversity(population: List[Chromosome]) -> float:
+    """Tính độ đa dạng của quần thể dựa trên sự khác biệt về route"""
+    if len(population) < 2:
+        return 1.0
+    
+    total_distance = 0
+    count = 0
+    
+    for i in range(len(population)):
+        for j in range(i + 1, len(population)):
+            distance = calculate_chromosome_distance(population[i], population[j])
+            total_distance += distance
+            count += 1
+    
+    return total_distance / count if count > 0 else 0.0
+
+def calculate_chromosome_distance(c1: Chromosome, c2: Chromosome) -> float:
+    """Tính khoảng cách giữa 2 chromosome dựa trên route structure"""
+    distance = 0
+    total_positions = 0
+    
+    # So sánh route của từng vehicle
+    for vehicle_id in c1.solution.keys():
+        route1 = c1.solution.get(vehicle_id, [])
+        route2 = c2.solution.get(vehicle_id, [])
+        
+        max_len = max(len(route1), len(route2))
+        total_positions += max_len
+        
+        # Đếm số vị trí khác nhau
+        for i in range(max_len):
+            node1_id = route1[i].id if i < len(route1) else None
+            node2_id = route2[i].id if i < len(route2) else None
+            
+            if node1_id != node2_id:
+                distance += 1
+    
+    # Normalize distance
+    return distance / total_positions if total_positions > 0 else 0.0
+
+def calculate_fitness_diversity(population: List[Chromosome]) -> float:
+    """Tính độ đa dạng dựa trên fitness values"""
+    if len(population) < 2:
+        return 1.0
+    
+    fitness_values = [c.fitness for c in population]
+    avg_fitness = sum(fitness_values) / len(fitness_values)
+    
+    # Tính độ lệch chuẩn
+    variance = sum((f - avg_fitness) ** 2 for f in fitness_values) / len(fitness_values)
+    std_dev = math.sqrt(variance)
+    
+    # Normalize bằng average fitness
+    return std_dev / avg_fitness if avg_fitness > 0 else 0.0
+
+def maintain_diversity(population: List[Chromosome], 
+                    id_to_vehicle: Dict[str, Vehicle],
+                    route_map: Dict[Tuple, Tuple],
+                    Base_vehicleid_to_plan: Dict[str, List[Node]],
+                    PDG_map: Dict[str, List[Node]],
+                    min_diversity: float = 0.15) -> List[Chromosome]:
+    """Duy trì độ đa dạng của quần thể"""
+    
+    diversity = calculate_diversity(population)
+    fitness_diversity = calculate_fitness_diversity(population)
+    
+    print(f"Current diversity: {diversity:.3f}, Fitness diversity: {fitness_diversity:.3f}", file=sys.stderr)
+    
+    # Nếu độ đa dạng quá thấp
+    if diversity < min_diversity or fitness_diversity < 0.15:
+        print("Low diversity detected, applying diversity maintenance...", file=sys.stderr)
+        
+        # Sắp xếp theo fitness
+        population.sort(key=lambda x: x.fitness)
+        
+        # Giữ lại elite (30% tốt nhất)
+        elite_size = max(2, len(population) * 3 // 10)
+        elite = population[:elite_size]
+        
+        # Loại bỏ các cá thể quá giống nhau
+        unique_population = remove_similar_individuals(elite, threshold=0.1)
+        
+        # Tạo cá thể mới để bù đắp
+        new_individuals = []
+        needed = len(population) - len(unique_population)
+        
+        for _ in range(needed):
+            # Tạo cá thể mới bằng nhiều phương pháp khác nhau
+            if random.random() < 0.5:
+                # Tạo hoàn toàn ngẫu nhiên
+                new_individual = generate_single_random_chromosome(Base_vehicleid_to_plan, route_map, id_to_vehicle, PDG_map)
+            else:
+                if random.random() < 0.5:
+                    # Mutate mạnh từ elite
+                    new_individual = copy.deepcopy(random.choice(elite))
+                    intensive_mutation(new_individual, id_to_vehicle, route_map)
+                else:
+                    # Random crossover từ elite
+                    parent1, parent2 = random.sample(elite, 2)
+                    new_individual = parent1.crossover(parent2, PDG_map)
+                    new_mutation(new_individual, is_limited=True)
+            
+            new_individuals.append(new_individual)
+        
+        return unique_population + new_individuals
+    
+    return population
+
+def remove_similar_individuals(population: List[Chromosome], threshold: float = 0.1) -> List[Chromosome]:
+    """Loại bỏ các cá thể quá giống nhau"""
+    unique_population = []
+    
+    for individual in population:
+        is_unique = True
+        
+        for unique_individual in unique_population:
+            distance = calculate_chromosome_distance(individual, unique_individual)
+            if distance < threshold:
+                # Giữ cá thể có fitness tốt hơn
+                if individual.fitness < unique_individual.fitness:
+                    unique_population.remove(unique_individual)
+                    unique_population.append(individual)
+                is_unique = False
+                break
+        
+        if is_unique:
+            unique_population.append(individual)
+    
+    return unique_population
+
+def intensive_mutation(individual: Chromosome, id_to_vehicle: Dict[str, Vehicle], route_map: Dict[Tuple, Tuple]):
+    """Mutation mạnh để tăng đa dạng"""
+    # Áp dụng mutation nhiều lần
+    for _ in range(random.randint(2, 5)):
+        new_mutation(individual, is_limited = False)
+    # Recalculate fitness
+    individual.fitness = individual.evaluate_fitness()
+
+def generate_single_random_chromosome(Base_vehicleid_to_plan: Dict[str, List[Node]], 
+                                    route_map: Dict[Tuple, Tuple],
+                                    id_to_vehicle: Dict[str, Vehicle],
+                                    PDG_map: Dict[str, List[Node]]) -> Chromosome:
+    """Tạo một cá thể ngẫu nhiên"""
+    temp_route: Dict[str, List[Node]] = {}
+    
+    # Copy base route
+    for vehicleID, plan in Base_vehicleid_to_plan.items():
+        temp_route[vehicleID] = [node for node in plan]
+    
+    # Random dispatch các PDG
+    for DPG in PDG_map.values():
+        if random.random() < 0.5:
+            # Random vehicle
+            selected_vehicleID = random.choice(list(id_to_vehicle.keys()))
+            temp_route[selected_vehicleID].extend(DPG)
+        else:
+            # Random dispatch
+            random_dispatch_nodePair(DPG, id_to_vehicle, temp_route)
+    
+    return Chromosome(temp_route, route_map, id_to_vehicle)

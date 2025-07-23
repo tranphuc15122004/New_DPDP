@@ -73,7 +73,7 @@ def get_algorithm_calling_command():
 
 
 # 开启进程，调用算法
-def subprocess_function(cmd):
+""" def subprocess_function(cmd):
     # 开启子进程，并连接到它们的输入/输出/错误管道，获取返回值
     sub_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, shell=True)
     try:
@@ -85,7 +85,32 @@ def subprocess_function(cmd):
         return end_time - start_time, sub_process.stdout.read().decode()
     except Exception as e:
         logger.error(e)
-        sys.exit(-1)
+        sys.exit(-1) """
+
+def subprocess_function(cmd):
+    sub_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, shell=True)
+    try:
+        start_time = time.time()
+        stdout, stderr = sub_process.communicate(timeout=Configs.MAX_RUNTIME_OF_ALGORITHM)
+        end_time = time.time()
+        return end_time - start_time, stdout.decode() 
+    
+    except subprocess.TimeoutExpired:
+        print("Tiến trình chạy quá lâu, đang hủy...")
+        sub_process.terminate()  # Kết thúc tiến trình con an toàn
+        sub_process.wait()  # Đợi tiến trình con kết thúc hoàn toàn
+        return None, "Timeout"
+
+    except Exception as e:
+        print("Lỗi xảy ra:", e)
+        return None, str(e)
+
+    finally:
+        # Đảm bảo tiến trình không bị treo sau khi chạy
+        if sub_process.poll() is None:
+            print("Tiến trình con vẫn chưa kết thúc, đang kill...")
+            sub_process.kill()
+
 
 
 """ IO"""

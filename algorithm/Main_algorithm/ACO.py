@@ -15,7 +15,7 @@ def ACO(initial_vehicleid_to_plan : Dict[str , List[Node]] ,route_map: Dict[Tupl
 
     heuristic_map: Dict[Tuple[str, str], float] = calculate_heuristic(pheromone_map , route_map )
     
-    best_solution: Chromosome = initial_vehicleid_to_plan
+    best_solution: Chromosome = None
     best_fitness = float('inf')
     stagnant_generations = 0
     time_of_1_iter = 0
@@ -45,8 +45,8 @@ def ACO(initial_vehicleid_to_plan : Dict[str , List[Node]] ,route_map: Dict[Tupl
             stagnant_generations += 1
 
         # --- In kết quả ---
-        for a in ants:
-            print(get_route_after(a.solution, {}), file=sys.stderr)
+        """ for a in ants:
+            print(get_route_after(a.solution, {}), file=sys.stderr) """
 
         print(f'Iteration {iteration + 1}: Best fittness = {best_fitness} , Worst fittness = {ants[-1].fitness} , Average = {sum(a.fitness for a in ants) / len(ants)}')
 
@@ -329,11 +329,10 @@ def construct_solution(Base_vehicleid_to_plan: Dict[str, List[Node]], super_node
             # Tính toán độ hấp dẫn của tất cả các node
             for node in considered_nodes:
                 # Tính độ hấp dẫn dựa trên pheromone và heuristic
-                attraction = calculate_node_attraction(plan, node, pheromone_map, heuristic_map, vehicle)
+                attraction = calculate_node_attraction(plan, node, pheromone_map, heuristic_map, vehicle , route_map)
                 
                 # Thêm vào danh sách độ hấp dẫn
                 attraction_dict[vehicleID].append((node, attraction))
-
         # Tính toán xem node nào sẽ được gán vào xe nào:
         # Chuyển sang phương pháp lựa chọn có xác suất (Roulette Wheel Selection)
         all_candidates = []  # [(vehicle_id, node, attraction_value), ...]
@@ -345,9 +344,8 @@ def construct_solution(Base_vehicleid_to_plan: Dict[str, List[Node]], super_node
                 if attraction_value > 0:  # Chỉ xét các node khả thi
                     all_candidates.append((vehicle_id, node, attraction_value))
                     total_attraction += attraction_value
-        
         # Nếu không có ứng viên nào khả thi
-        if not all_candidates or total_attraction <= 0:
+        if not all_candidates or len(all_candidates) == 0 or total_attraction <= 0:
             #print('error 1' , file= sys.stderr)
             is_fesible_solution = False
         
@@ -558,7 +556,7 @@ def repair_solution(solution: Dict[str, List[Node]], Base_vehicleid_to_plan: Dic
             break
     return repaired_solution if all_feasible else None
 
-def calculate_node_attraction(route: List[Node], node: Node, pheromone_map: Dict[Tuple[str, str], float],heuristic_map: Dict[Tuple[str, str], float],vehicle: Vehicle) -> float:
+def calculate_node_attraction(route: List[Node], node: Node, pheromone_map: Dict[Tuple[str, str], float],heuristic_map: Dict[Tuple[str, str], float],vehicle: Vehicle , route_map) -> float:
     """
     Tính điểm hấp dẫn của việc thêm một node vào cuối tuyến đường.
     """
@@ -575,11 +573,33 @@ def calculate_node_attraction(route: List[Node], node: Node, pheromone_map: Dict
     if not isFeasible(temp_route , carrying_items, vehicle.board_capacity):
         return 0.0 """
     
+    
     # Tính độ hấp dẫn dựa trên công thức ACO tiêu chuẩn
     if key in pheromone_map and key in heuristic_map:
         pheromone = pheromone_map[key]
         heuristic = heuristic_map[key]
-        return pow(pheromone, ALPHA) * pow(heuristic, BETA)
+        if node.pickup_item_list:
+            TW_heuristic = node.pickup_item_list[0].committed_completion_time
+        else:
+            TW_heuristic = node.delivery_item_list[0].committed_completion_time
+        
+        currT = 0
+        if not vehicle.des:
+            if vehicle.cur_factory_id == temp_route[0].id:
+                currT = vehicle.leave_time_at_current_factory
+            else:
+                dis_and_time = route_map.get((vehicle.cur_factory_id , temp_route[0].id))
+                time = int(dis_and_time[1])
+                currT = vehicle.leave_time_at_current_factory + time
+        else:    
+            currT = vehicle.des.arrive_time
+        
+        # thoi gian con lai de hoan thanh don
+        TW_heuristic = (TW_heuristic - currT)
+        # neu cai tren cang nho -> cai duoi cang to
+        TW_heuristic = (4 * 3600) / (4* 3600 +  TW_heuristic)
+        
+        return pow(pheromone, ALPHA) * pow(heuristic, BETA) * pow(TW_heuristic , BETA)
     
     # Giá trị mặc định nếu không tìm thấy thông tin
     return 0.1

@@ -5,6 +5,8 @@ Delta1 = 10000.0
 SLACK_TIME_THRESHOLD = 10000
 debugPeriod = "0010-0020"
 addDelta = 300000.0
+BEGIN_TIME = 0
+ALGO_TIME_LIMIT = 9*10 + 50
 
 """GA configuration"""
 POPULATION_SIZE = 20
@@ -14,9 +16,9 @@ LS_MAX = 20
 
 """ ACO configuration """
 POPULATION_SIZE_ACO = 20
-NUMBER_OF_GENERATION_ACO = 500
+NUMBER_OF_GENERATION_ACO = 100
 ALPHA = 1.0          # Mức độ ảnh hưởng của pheromone
-BETA = 2.5           # Mức độ ảnh hưởng của heuristic
+BETA = 0.5           # Mức độ ảnh hưởng của heuristic
 Q = 100              # Hằng số dùng trong cập nhật pheromone
 BASE_PHEROMONE = 0.1         # Giá trị pheromone cơ bản\
 EVAPORATION_RATE = 0.85   # Hệ số bay hơi (0.0 - 1.0)

@@ -1,0 +1,382 @@
+2025-07-19 20:51:43,203 [main.py         | 48] INFO: Start to run instance_10
+2025-07-19 20:51:43,203 [simulate_api.py | 60] INFO: Start time of the simulator: 2025-07-19 00:00:00, time interval:  600.00
+2025-07-19 20:51:43,223 [input_utils.py  | 48] INFO: Get 154 factories
+2025-07-19 20:51:43,947 [input_utils.py  | 52] INFO: Get 23562 routes
+2025-07-19 20:51:43,973 [input_utils.py  | 57] INFO: Get 5 vehicles
+2025-07-19 20:51:43,989 [input_utils.py  | 61] INFO: Get 100 orders
+2025-07-19 20:51:43,989 [simulate_api.py | 87] INFO: Initial position of V_1 is e2d5093fbe36431f8986ddb0e1c586be
+2025-07-19 20:51:43,993 [simulate_api.py | 87] INFO: Initial position of V_2 is 7fe14b93f0f04ee7a994ef5b2c1fdb72
+2025-07-19 20:51:43,993 [simulate_api.py | 87] INFO: Initial position of V_3 is fa366fc87a124d32926daa5bb093129f
+2025-07-19 20:51:43,993 [simulate_api.py | 87] INFO: Initial position of V_4 is e47399648fa842b2b8f80094343d8091
+2025-07-19 20:51:43,993 [simulate_api.py | 87] INFO: Initial position of V_5 is becb4f85393540b287e7329758b8d832
+2025-07-19 20:51:43,993 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:51:43,993 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 00:10:00, pre time: 2025-07-19 00:00:00
+2025-07-19 20:51:43,993 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 00:10:00
+2025-07-19 20:51:43,993 [simulate_environment.py | 167] INFO: Get 0 unallocated order items, 0 ongoing order items, 0 completed order items
+2025-07-19 20:51:45,227 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[]
+The fitness value before EA: 0.0
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[]
+The fitness value after EA: 0.0
+SUCCESS
+
+2025-07-19 20:51:45,243 [simulate_environment.py | 254] INFO: 2025-07-19 00:10:00, Item 0010370001-1: state = 0 < 2, we can not finish the simulation
+2025-07-19 20:51:45,244 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:51:45,244 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 00:20:00, pre time: 2025-07-19 00:10:00
+2025-07-19 20:51:45,245 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 00:20:00
+2025-07-19 20:51:45,245 [simulate_environment.py | 167] INFO: Get 4 unallocated order items, 0 ongoing order items, 0 completed order items
+2025-07-19 20:51:46,463 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[] V_3:[p1_0010370001-1 d1_0010370001-1] V_4:[] V_5:[p3_0012530002-1 d3_0012530002-3]
+The fitness value before EA: 0.8800000000000001
+V_1:[] V_2:[] V_3:[p1_0010370001-1 d1_0010370001-1] V_4:[] V_5:[p3_0012530002-1 d3_0012530002-3]
+The fitness value after EA: 0.8800000000000001
+SUCCESS
+
+2025-07-19 20:51:46,479 [simulate_environment.py | 254] INFO: 2025-07-19 00:20:00, Item 0010370001-1: state = 1 < 2, we can not finish the simulation
+2025-07-19 20:51:46,479 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:51:46,479 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 00:30:00, pre time: 2025-07-19 00:20:00
+2025-07-19 20:51:46,479 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 00:30:00
+2025-07-19 20:51:46,488 [simulate_environment.py | 167] INFO: Get 0 unallocated order items, 4 ongoing order items, 0 completed order items
+2025-07-19 20:51:47,679 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[] V_3:[d1_0010370001-1] V_4:[] V_5:[d3_0012530002-3]
+The fitness value before EA: 0.6599999999999999
+V_1:[] V_2:[] V_3:[d1_0010370001-1] V_4:[] V_5:[d3_0012530002-3]
+The fitness value after EA: 0.6599999999999999
+SUCCESS
+
+2025-07-19 20:51:47,688 [simulate_environment.py | 254] INFO: 2025-07-19 00:30:00, Item 0221280003-1: state = 0 < 2, we can not finish the simulation
+2025-07-19 20:51:47,688 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:51:47,688 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 00:40:00, pre time: 2025-07-19 00:30:00
+2025-07-19 20:51:47,688 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 00:40:00
+2025-07-19 20:51:47,693 [simulate_environment.py | 167] INFO: Get 0 unallocated order items, 4 ongoing order items, 0 completed order items
+2025-07-19 20:51:48,870 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[] V_3:[d1_0010370001-1] V_4:[] V_5:[d3_0012530002-3]
+The fitness value before EA: 0.6599999999999999
+V_1:[] V_2:[] V_3:[d1_0010370001-1] V_4:[] V_5:[d3_0012530002-3]
+The fitness value after EA: 0.6599999999999999
+SUCCESS
+
+2025-07-19 20:51:48,870 [simulate_environment.py | 254] INFO: 2025-07-19 00:40:00, Item 0221280003-1: state = 0 < 2, we can not finish the simulation
+2025-07-19 20:51:48,870 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:51:48,870 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 00:50:00, pre time: 2025-07-19 00:40:00
+2025-07-19 20:51:48,873 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 00:50:00
+2025-07-19 20:51:48,879 [simulate_environment.py | 167] INFO: Get 0 unallocated order items, 4 ongoing order items, 0 completed order items
+2025-07-19 20:51:50,047 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[] V_3:[d1_0010370001-1] V_4:[] V_5:[d3_0012530002-3]
+The fitness value before EA: 0.6599999999999999
+V_1:[] V_2:[] V_3:[d1_0010370001-1] V_4:[] V_5:[d3_0012530002-3]
+The fitness value after EA: 0.6599999999999999
+SUCCESS
+
+2025-07-19 20:51:50,049 [simulate_environment.py | 254] INFO: 2025-07-19 00:50:00, Item 0221280003-1: state = 0 < 2, we can not finish the simulation
+2025-07-19 20:51:50,049 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:51:50,049 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 01:00:00, pre time: 2025-07-19 00:50:00
+2025-07-19 20:51:50,049 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 01:00:00
+2025-07-19 20:51:50,051 [simulate_environment.py | 167] INFO: Get 0 unallocated order items, 3 ongoing order items, 1 completed order items
+2025-07-19 20:51:51,271 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[d3_0012530002-3]
+The fitness value before EA: 0.0
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[d3_0012530002-3]
+The fitness value after EA: 0.0
+SUCCESS
+
+2025-07-19 20:51:51,273 [simulate_environment.py | 254] INFO: 2025-07-19 01:00:00, Item 0221280003-1: state = 0 < 2, we can not finish the simulation
+2025-07-19 20:51:51,273 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:51:51,273 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 01:10:00, pre time: 2025-07-19 01:00:00
+2025-07-19 20:51:51,273 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 01:10:00
+2025-07-19 20:51:51,285 [simulate_environment.py | 167] INFO: Get 0 unallocated order items, 0 ongoing order items, 4 completed order items
+2025-07-19 20:51:52,473 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[]
+The fitness value before EA: 0.0
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[]
+The fitness value after EA: 0.0
+SUCCESS
+
+2025-07-19 20:51:52,473 [simulate_environment.py | 254] INFO: 2025-07-19 01:10:00, Item 0221280003-1: state = 0 < 2, we can not finish the simulation
+2025-07-19 20:51:52,473 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:51:52,473 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 01:20:00, pre time: 2025-07-19 01:10:00
+2025-07-19 20:51:52,473 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 01:20:00
+2025-07-19 20:51:52,488 [simulate_environment.py | 167] INFO: Get 0 unallocated order items, 0 ongoing order items, 4 completed order items
+2025-07-19 20:51:53,663 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[]
+The fitness value before EA: 0.0
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[]
+The fitness value after EA: 0.0
+SUCCESS
+
+2025-07-19 20:51:53,663 [simulate_environment.py | 254] INFO: 2025-07-19 01:20:00, Item 0221280003-1: state = 0 < 2, we can not finish the simulation
+2025-07-19 20:51:53,663 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:51:53,663 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 01:30:00, pre time: 2025-07-19 01:20:00
+2025-07-19 20:51:53,663 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 01:30:00
+2025-07-19 20:51:53,675 [simulate_environment.py | 167] INFO: Get 0 unallocated order items, 0 ongoing order items, 4 completed order items
+2025-07-19 20:51:54,843 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[]
+The fitness value before EA: 0.0
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[]
+The fitness value after EA: 0.0
+SUCCESS
+
+2025-07-19 20:51:54,854 [simulate_environment.py | 254] INFO: 2025-07-19 01:30:00, Item 0221280003-1: state = 0 < 2, we can not finish the simulation
+2025-07-19 20:51:54,854 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:51:54,854 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 01:40:00, pre time: 2025-07-19 01:30:00
+2025-07-19 20:51:54,854 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 01:40:00
+2025-07-19 20:51:54,863 [simulate_environment.py | 167] INFO: Get 0 unallocated order items, 0 ongoing order items, 4 completed order items
+2025-07-19 20:51:56,043 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[]
+The fitness value before EA: 0.0
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[]
+The fitness value after EA: 0.0
+SUCCESS
+
+2025-07-19 20:51:56,053 [simulate_environment.py | 254] INFO: 2025-07-19 01:40:00, Item 0221280003-1: state = 0 < 2, we can not finish the simulation
+2025-07-19 20:51:56,053 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:51:56,053 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 01:50:00, pre time: 2025-07-19 01:40:00
+2025-07-19 20:51:56,053 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 01:50:00
+2025-07-19 20:51:56,053 [simulate_environment.py | 167] INFO: Get 0 unallocated order items, 0 ongoing order items, 4 completed order items
+2025-07-19 20:51:57,254 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[]
+The fitness value before EA: 0.0
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[]
+The fitness value after EA: 0.0
+SUCCESS
+
+2025-07-19 20:51:57,256 [simulate_environment.py | 254] INFO: 2025-07-19 01:50:00, Item 0221280003-1: state = 0 < 2, we can not finish the simulation
+2025-07-19 20:51:57,256 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:51:57,256 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 02:00:00, pre time: 2025-07-19 01:50:00
+2025-07-19 20:51:57,256 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 02:00:00
+2025-07-19 20:51:57,257 [simulate_environment.py | 167] INFO: Get 0 unallocated order items, 0 ongoing order items, 4 completed order items
+2025-07-19 20:51:58,427 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[]
+The fitness value before EA: 0.0
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[]
+The fitness value after EA: 0.0
+SUCCESS
+
+2025-07-19 20:51:58,433 [simulate_environment.py | 254] INFO: 2025-07-19 02:00:00, Item 0221280003-1: state = 0 < 2, we can not finish the simulation
+2025-07-19 20:51:58,433 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:51:58,433 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 02:10:00, pre time: 2025-07-19 02:00:00
+2025-07-19 20:51:58,433 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 02:10:00
+2025-07-19 20:51:58,433 [simulate_environment.py | 167] INFO: Get 0 unallocated order items, 0 ongoing order items, 4 completed order items
+2025-07-19 20:51:59,603 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[]
+The fitness value before EA: 0.0
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[]
+The fitness value after EA: 0.0
+SUCCESS
+
+2025-07-19 20:51:59,603 [simulate_environment.py | 254] INFO: 2025-07-19 02:10:00, Item 0221280003-1: state = 0 < 2, we can not finish the simulation
+2025-07-19 20:51:59,603 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:51:59,603 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 02:20:00, pre time: 2025-07-19 02:10:00
+2025-07-19 20:51:59,603 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 02:20:00
+2025-07-19 20:51:59,603 [simulate_environment.py | 167] INFO: Get 0 unallocated order items, 0 ongoing order items, 4 completed order items
+2025-07-19 20:52:00,764 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[]
+The fitness value before EA: 0.0
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[]
+The fitness value after EA: 0.0
+SUCCESS
+
+2025-07-19 20:52:00,773 [simulate_environment.py | 254] INFO: 2025-07-19 02:20:00, Item 0221280003-1: state = 0 < 2, we can not finish the simulation
+2025-07-19 20:52:00,773 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:52:00,773 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 02:30:00, pre time: 2025-07-19 02:20:00
+2025-07-19 20:52:00,773 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 02:30:00
+2025-07-19 20:52:00,774 [simulate_environment.py | 167] INFO: Get 1 unallocated order items, 0 ongoing order items, 4 completed order items
+2025-07-19 20:52:01,986 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[] V_3:[p1_0221280003-1 d1_0221280003-1] V_4:[] V_5:[]
+The fitness value before EA: 6.5
+V_1:[] V_2:[] V_3:[p1_0221280003-1 d1_0221280003-1] V_4:[] V_5:[]
+The fitness value after EA: 6.5
+SUCCESS
+
+2025-07-19 20:52:01,998 [simulate_environment.py | 254] INFO: 2025-07-19 02:30:00, Item 0221280003-1: state = 1 < 2, we can not finish the simulation
+2025-07-19 20:52:01,998 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:52:01,998 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 02:40:00, pre time: 2025-07-19 02:30:00
+2025-07-19 20:52:01,998 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 02:40:00
+2025-07-19 20:52:02,004 [simulate_environment.py | 167] INFO: Get 1 unallocated order items, 0 ongoing order items, 4 completed order items
+2025-07-19 20:52:03,165 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[] V_3:[p1_0221280003-1 d1_0221280003-1] V_4:[] V_5:[]
+The fitness value before EA: 3.4799999999999995
+V_1:[] V_2:[] V_3:[p1_0221280003-1 d1_0221280003-1] V_4:[] V_5:[]
+The fitness value after EA: 3.4799999999999995
+SUCCESS
+
+2025-07-19 20:52:03,176 [simulate_environment.py | 254] INFO: 2025-07-19 02:40:00, Item 0221280003-1: state = 1 < 2, we can not finish the simulation
+2025-07-19 20:52:03,176 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:52:03,176 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 02:50:00, pre time: 2025-07-19 02:40:00
+2025-07-19 20:52:03,176 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 02:50:00
+2025-07-19 20:52:03,191 [simulate_environment.py | 167] INFO: Get 1 unallocated order items, 0 ongoing order items, 4 completed order items
+2025-07-19 20:52:04,373 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[] V_3:[p1_0221280003-1 d1_0221280003-1] V_4:[] V_5:[]
+The fitness value before EA: 3.4799999999999995
+V_1:[] V_2:[] V_3:[p1_0221280003-1 d1_0221280003-1] V_4:[] V_5:[]
+The fitness value after EA: 3.4799999999999995
+SUCCESS
+
+2025-07-19 20:52:04,373 [simulate_environment.py | 254] INFO: 2025-07-19 02:50:00, Item 0221280003-1: state = 1 < 2, we can not finish the simulation
+2025-07-19 20:52:04,373 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:52:04,373 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 03:00:00, pre time: 2025-07-19 02:50:00
+2025-07-19 20:52:04,373 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 03:00:00
+2025-07-19 20:52:04,383 [simulate_environment.py | 167] INFO: Get 1 unallocated order items, 0 ongoing order items, 4 completed order items
+2025-07-19 20:52:05,546 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[] V_3:[p1_0221280003-1 d1_0221280003-1] V_4:[] V_5:[]
+The fitness value before EA: 3.4799999999999995
+V_1:[] V_2:[] V_3:[p1_0221280003-1 d1_0221280003-1] V_4:[] V_5:[]
+The fitness value after EA: 3.4799999999999995
+SUCCESS
+
+2025-07-19 20:52:05,549 [simulate_environment.py | 254] INFO: 2025-07-19 03:00:00, Item 0221280003-1: state = 1 < 2, we can not finish the simulation
+2025-07-19 20:52:05,549 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:52:05,549 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 03:10:00, pre time: 2025-07-19 03:00:00
+2025-07-19 20:52:05,549 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 03:10:00
+2025-07-19 20:52:05,551 [simulate_environment.py | 167] INFO: Get 23 unallocated order items, 1 ongoing order items, 4 completed order items
+2025-07-19 20:52:06,733 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[p15_0302310004-1 d15_0302310004-15] V_3:[d1_0221280003-1] V_4:[] V_5:[p2_0304490005-1 p6_0302310004-16 d6_0302310004-21 d2_0304490005-2]
+The fitness value before EA: 9.98
+V_1:[] V_2:[p15_0302310004-1 d15_0302310004-15] V_3:[d1_0221280003-1] V_4:[] V_5:[p2_0304490005-1 p6_0302310004-16 d6_0302310004-21 d2_0304490005-2]
+The fitness value after EA: 9.98
+SUCCESS
+
+2025-07-19 20:52:06,755 [simulate_environment.py | 254] INFO: 2025-07-19 03:10:00, Item 0302310004-1: state = 1 < 2, we can not finish the simulation
+2025-07-19 20:52:06,755 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:52:06,755 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 03:20:00, pre time: 2025-07-19 03:10:00
+2025-07-19 20:52:06,755 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 03:20:00
+2025-07-19 20:52:06,769 [simulate_environment.py | 167] INFO: Get 39 unallocated order items, 1 ongoing order items, 4 completed order items
+2025-07-19 20:52:07,969 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[p15_0302310004-1 d15_0302310004-15] V_3:[d1_0221280003-1 p16_0312080006-1 d16_0312080006-16] V_4:[] V_5:[p2_0304490005-1 p6_0302310004-16 d6_0302310004-21 d2_0304490005-2]
+The fitness value before EA: 10.040000000000001
+V_1:[] V_2:[p15_0302310004-1 d15_0302310004-15] V_3:[d1_0221280003-1 p16_0312080006-1 d16_0312080006-16] V_4:[] V_5:[p2_0304490005-1 p6_0302310004-16 d6_0302310004-21 d2_0304490005-2]
+The fitness value after EA: 10.040000000000001
+SUCCESS
+
+2025-07-19 20:52:07,990 [simulate_environment.py | 254] INFO: 2025-07-19 03:20:00, Item 0302310004-1: state = 1 < 2, we can not finish the simulation
+2025-07-19 20:52:07,990 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:52:07,990 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 03:30:00, pre time: 2025-07-19 03:20:00
+2025-07-19 20:52:07,990 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 03:30:00
+2025-07-19 20:52:08,006 [simulate_environment.py | 167] INFO: Get 19 unallocated order items, 24 ongoing order items, 4 completed order items
+2025-07-19 20:52:09,183 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[d15_0302310004-15 p1_0321200008-1 d1_0321200008-1] V_3:[d1_0221280003-1 p16_0312080006-1 d16_0312080006-16] V_4:[] V_5:[d6_0302310004-21 p2_0320140007-1 d2_0320140007-2 d2_0304490005-2]
+The fitness value before EA: 10.659999999999998
+V_1:[] V_2:[d15_0302310004-15 p1_0321200008-1 d1_0321200008-1] V_3:[d1_0221280003-1 p16_0312080006-1 d16_0312080006-16] V_4:[] V_5:[d6_0302310004-21 p2_0320140007-1 d2_0320140007-2 d2_0304490005-2]
+The fitness value after EA: 10.659999999999998
+SUCCESS
+
+2025-07-19 20:52:09,209 [simulate_environment.py | 254] INFO: 2025-07-19 03:30:00, Item 0312080006-1: state = 1 < 2, we can not finish the simulation
+2025-07-19 20:52:09,209 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:52:09,209 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 03:40:00, pre time: 2025-07-19 03:30:00
+2025-07-19 20:52:09,210 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 03:40:00
+2025-07-19 20:52:09,222 [simulate_environment.py | 167] INFO: Get 19 unallocated order items, 24 ongoing order items, 4 completed order items
+2025-07-19 20:52:10,413 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[d15_0302310004-15 p1_0321200008-1 d1_0321200008-1] V_3:[d1_0221280003-1 p16_0312080006-1 d16_0312080006-16] V_4:[] V_5:[d6_0302310004-21 p2_0320140007-1 d2_0320140007-2 d2_0304490005-2]
+The fitness value before EA: 7.179999999999998
+V_1:[] V_2:[d15_0302310004-15 p1_0321200008-1 d1_0321200008-1] V_3:[d1_0221280003-1 p16_0312080006-1 d16_0312080006-16] V_4:[] V_5:[d6_0302310004-21 p2_0320140007-1 d2_0320140007-2 d2_0304490005-2]
+The fitness value after EA: 7.179999999999998
+SUCCESS
+
+2025-07-19 20:52:10,426 [simulate_environment.py | 254] INFO: 2025-07-19 03:40:00, Item 0312080006-1: state = 1 < 2, we can not finish the simulation
+2025-07-19 20:52:10,426 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:52:10,426 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 03:50:00, pre time: 2025-07-19 03:40:00
+2025-07-19 20:52:10,426 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 03:50:00
+2025-07-19 20:52:10,441 [simulate_environment.py | 167] INFO: Get 20 unallocated order items, 24 ongoing order items, 4 completed order items
+2025-07-19 20:52:11,671 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[d15_0302310004-15 p1_0321200008-1 d1_0321200008-1] V_3:[d1_0221280003-1 p16_0312080006-1 d16_0312080006-16] V_4:[] V_5:[d6_0302310004-21 p2_0320140007-1 p1_0341360009-1 d1_0341360009-1 d2_0320140007-2 d2_0304490005-2]
+The fitness value before EA: 7.179999999999998
+V_1:[] V_2:[d15_0302310004-15 p1_0321200008-1 d1_0321200008-1] V_3:[d1_0221280003-1 p16_0312080006-1 d16_0312080006-16] V_4:[] V_5:[d6_0302310004-21 p2_0320140007-1 p1_0341360009-1 d1_0341360009-1 d2_0320140007-2 d2_0304490005-2]
+The fitness value after EA: 7.179999999999998
+SUCCESS
+
+2025-07-19 20:52:11,683 [simulate_environment.py | 254] INFO: 2025-07-19 03:50:00, Item 0312080006-1: state = 1 < 2, we can not finish the simulation
+2025-07-19 20:52:11,683 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:52:11,683 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 04:00:00, pre time: 2025-07-19 03:50:00
+2025-07-19 20:52:11,683 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 04:00:00
+2025-07-19 20:52:11,691 [simulate_environment.py | 167] INFO: Get 20 unallocated order items, 24 ongoing order items, 4 completed order items
+2025-07-19 20:52:13,228 [simulate_environment.py | 232] INFO: 
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[d15_0302310004-15 p1_0321200008-1 d1_0321200008-1] V_3:[d1_0221280003-1 p16_0312080006-1 d16_0312080006-16] V_4:[] V_5:[d6_0302310004-21 p2_0320140007-1 p1_0341360009-1 d1_0341360009-1 d2_0320140007-2 d2_0304490005-2]
+The fitness value before EA: 7.179999999999998
+V_1:[] V_2:[d15_0302310004-15 p1_0321200008-1 d1_0321200008-1] V_3:[d1_0221280003-1 p16_0312080006-1 d16_0312080006-16] V_4:[] V_5:[d6_0302310004-21 p2_0320140007-1 p1_0341360009-1 d1_0341360009-1 d2_0320140007-2 d2_0304490005-2]
+The fitness value after EA: 7.179999999999998
+SUCCESS
+
+2025-07-19 20:52:13,239 [simulate_environment.py | 254] INFO: 2025-07-19 04:00:00, Item 0312080006-1: state = 1 < 2, we can not finish the simulation
+2025-07-19 20:52:13,239 [simulate_environment.py | 99] INFO: **************************************************
+2025-07-19 20:52:13,239 [simulate_environment.py | 103] INFO: cur time: 2025-07-19 04:10:00, pre time: 2025-07-19 04:00:00
+2025-07-19 20:52:13,239 [simulate_environment.py | 140] INFO: Start to update the input of 2025-07-19 04:10:00
+2025-07-19 20:52:13,253 [simulate_environment.py | 167] INFO: Get 5 unallocated order items, 39 ongoing order items, 5 completed order items
+2025-07-19 20:52:14,500 [simulate_environment.py | 232] INFO: 
+2025-07-19 20:52:14,448 [main_algorithm.py | 31] ERROR: Failed to run algorithm
+2025-07-19 20:52:14,448 [main_algorithm.py | 32] ERROR: Error: name 'mutation_rate' is not defined, Traceback (most recent call last):
+  File "C:\PHUC\DPDP\New_DPDP\main_algorithm.py", line 28, in <module>
+    main()
+  File "C:\PHUC\DPDP\New_DPDP\algorithm\main.py", line 43, in main
+    best_chromosome : Chromosome = new_GA(vehicleid_to_plan , route_map , id_to_vehicle , Unongoing_super_nodes , Base_vehicleid_to_plan)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\PHUC\DPDP\New_DPDP\algorithm\Test_algorithm\new_GA.py", line 101, in new_GA
+    f'MutRate = {mutation_rate:.3f}')
+                 ^^^^^^^^^^^^^
+NameError: name 'mutation_rate' is not defined
+
+FAIL
+
+2025-07-19 20:52:14,502 [simulate_environment.py | 246] ERROR: 
+2025-07-19 20:52:14,448 [main_algorithm.py | 31] ERROR: Failed to run algorithm
+2025-07-19 20:52:14,448 [main_algorithm.py | 32] ERROR: Error: name 'mutation_rate' is not defined, Traceback (most recent call last):
+  File "C:\PHUC\DPDP\New_DPDP\main_algorithm.py", line 28, in <module>
+    main()
+  File "C:\PHUC\DPDP\New_DPDP\algorithm\main.py", line 43, in main
+    best_chromosome : Chromosome = new_GA(vehicleid_to_plan , route_map , id_to_vehicle , Unongoing_super_nodes , Base_vehicleid_to_plan)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\PHUC\DPDP\New_DPDP\algorithm\Test_algorithm\new_GA.py", line 101, in new_GA
+    f'MutRate = {mutation_rate:.3f}')
+                 ^^^^^^^^^^^^^
+NameError: name 'mutation_rate' is not defined
+
+FAIL
+
+2025-07-19 20:52:14,502 [simulate_environment.py | 247] ERROR: Can not catch the 'SUCCESS' from the algorithm. 未寻获算法输出成功标识'SUCCESS'。
