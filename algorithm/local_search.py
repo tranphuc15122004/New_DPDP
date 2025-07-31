@@ -57,7 +57,8 @@ def inter_couple_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehic
     
     vehicle = id_to_vehicle.get(vehicleID , None)
     route_node_list = vehicleid_to_plan.get(vehicleID)
-    cost0 = cost_of_a_route(route_node_list, vehicle , id_to_vehicle , route_map , vehicleid_to_plan)
+    cost0 = total_cost(id_to_vehicle , route_map, vehicleid_to_plan)
+    #cost0 = cost_of_a_route(route_node_list, vehicle , id_to_vehicle , route_map , vehicleid_to_plan)
     min_cost = cost0
 
     min_cost_pdg1_key_str : str = None
@@ -705,7 +706,7 @@ def improve_ci_path_by_2_opt(vehicleid_to_plan: Dict[str , List[Node]], id_to_ve
             break
         endtime = time.time()
         usedtime = (endtime - config.BEGIN_TIME)
-        if usedtime > 9 * 60:
+        if usedtime > config.ALGO_TIME_LIMIT:
             print("TimeOut !!!!!!!!!!!!!!" )
             return is_improved
     return is_improved

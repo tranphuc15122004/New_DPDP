@@ -5,6 +5,7 @@ import random
 from algorithm.engine import *
 from algorithm.Test_algorithm.new_LS import *
 from algorithm.Test_algorithm.new_engine import *
+from algorithm.Test_algorithm.new_LS import *
 
 
 def new_GA(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tuple, Tuple], 
@@ -42,12 +43,12 @@ def new_GA(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tup
         population = new_population
         
         for c in population:
-            if random.uniform(0, 1) <= config.MUTATION_RATE:
-                c.mutate(True, False)
-
+            new_mutation(c , True)
+            #c.mutate(True, False)
+        
         # Duy trì đa dạng mỗi thế hệ
         population = maintain_diversity(population, id_to_vehicle, route_map, Base_vehicleid_to_plan, PDG_map)
-
+        
         # Sắp xếp lại quần thể
         population.sort(key=lambda x: x.fitness)
 
@@ -58,8 +59,18 @@ def new_GA(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tup
         else:
             stagnant_generations += 1
 
+
+        diversity = calculate_diversity(population)
+        fitness_diversity = calculate_fitness_diversity(population)
+        
+        print(f'Generation {gen+1}: Best = {best_solution.fitness:.2f}, '
+            f'Worst = {population[-1].fitness:.2f}, '
+            f'Avg = {sum([c.fitness for c in population]) / len(population):.2f}, '
+            f'Diversity = {diversity:.3f}, '
+            f'FitDiv = {fitness_diversity:.3f}')
+
         # Điều kiện dừng
-        if stagnant_generations >= 10:
+        if stagnant_generations >= 6:
             print("Stopping early due to lack of improvement.")
             break
 
@@ -82,16 +93,6 @@ def new_GA(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tup
         if elapsed_time + estimated_next_gen_time > config.ALGO_TIME_LIMIT:
             print(f"TimeOut!! Elapsed: {elapsed_time:.1f}s, Estimated next gen: {estimated_next_gen_time:.1f}s")
             break
-        
-        # Tính và in diversity
-        diversity = calculate_diversity(population)
-        fitness_diversity = calculate_fitness_diversity(population)
-        
-        print(f'Generation {gen+1}: Best = {best_solution.fitness:.2f}, '
-            f'Worst = {population[-1].fitness:.2f}, '
-            f'Avg = {sum([c.fitness for c in population]) / len(population):.2f}, '
-            f'Diversity = {diversity:.3f}, '
-            f'FitDiv = {fitness_diversity:.3f}')
 
     final_time = time.time()
     total_runtime = final_time - config.BEGIN_TIME
@@ -118,7 +119,7 @@ def select_parents(population: List[Chromosome]) -> Tuple[Chromosome, Chromosome
         return population[-1]
     
     # Kết hợp cả 2 phương pháp
-    if random.random() < 0.5:
+    if random.random() < 0.75:
         return tournament_selection(), tournament_selection()
     else:
         return roulette_wheel_selection(), roulette_wheel_selection()
@@ -234,28 +235,45 @@ def new_mutation(indivisual: Chromosome, is_limited=False):
     # Counter cho từng phương pháp
     counters = {name: 0 for name in methods.keys()}
     
-    while True:
+    # Lấy danh sách tên phương pháp và trộn ngẫu nhiên cho mỗi iteration
+    method_names = list(methods.keys())
+    random.shuffle(method_names)
+    
+    while i < config.LS_MAX:
         is_improved = False
         
-        # Lấy danh sách tên phương pháp và trộn ngẫu nhiên cho mỗi iteration
-        method_names = list(methods.keys())
-        random.shuffle(method_names)
+        if methods[method_names[0]]():
+            i += 1
+            counters[method_names[0]] += 1
+            is_improved = True
+            continue
         
-        # Thực hiện tuần tự tất cả các phương pháp theo thứ tự đã trộn
-        for method_name in method_names:
-            method_improved = True
-            
-            # Nếu phương pháp này cải thiện được, tiếp tục thực hiện nó cho đến khi không cải thiện được nữa
-            while method_improved:
-                method_improved = False
-                
-                if methods[method_name]():
-                    counters[method_name] += 1
-                    method_improved = True
-                    is_improved = True
+        if methods[method_names[1]]():
+            i += 1
+            counters[method_names[1]] += 1
+            is_improved = True
+            continue
+        
+        if methods[method_names[2]]():
+            i += 1
+            counters[method_names[2]] += 1
+            is_improved = True
+            continue
+        
+        if methods[method_names[3]]():
+            i += 1
+            counters[method_names[3]] += 1
+            is_improved = True
+            continue
+        
+        if methods[method_names[4]]():
+            i += 1
+            counters[method_names[4]] += 1
+            is_improved = True
+            continue
         
         if is_improved:
-            i += 1
+            i += 0
         else:
             break
     indivisual.fitness = indivisual.evaluate_fitness()
@@ -321,7 +339,7 @@ def maintain_diversity(population: List[Chromosome],
                     route_map: Dict[Tuple, Tuple],
                     Base_vehicleid_to_plan: Dict[str, List[Node]],
                     PDG_map: Dict[str, List[Node]],
-                    min_diversity: float = 0.15) -> List[Chromosome]:
+                    min_diversity: float = 0.15 ) -> List[Chromosome]:
     """Duy trì độ đa dạng của quần thể"""
     
     diversity = calculate_diversity(population)
@@ -330,14 +348,14 @@ def maintain_diversity(population: List[Chromosome],
     print(f"Current diversity: {diversity:.3f}, Fitness diversity: {fitness_diversity:.3f}", file=sys.stderr)
     
     # Nếu độ đa dạng quá thấp
-    if diversity < min_diversity or fitness_diversity < 0.15:
-        print("Low diversity detected, applying diversity maintenance...", file=sys.stderr)
+    if diversity < min_diversity or fitness_diversity < min_diversity:
+        print("Low diversity detected, applying diversity maintenance...")
         
         # Sắp xếp theo fitness
         population.sort(key=lambda x: x.fitness)
         
         # Giữ lại elite (30% tốt nhất)
-        elite_size = max(2, len(population) * 3 // 10)
+        elite_size = max(2, len(population) // 2)
         elite = population[:elite_size]
         
         # Loại bỏ các cá thể quá giống nhau
@@ -345,28 +363,27 @@ def maintain_diversity(population: List[Chromosome],
         
         # Tạo cá thể mới để bù đắp
         new_individuals = []
-        needed = len(population) - len(unique_population)
+        needed = config.POPULATION_SIZE - len(unique_population)
         
         for _ in range(needed):
             # Tạo cá thể mới bằng nhiều phương pháp khác nhau
-            if random.random() < 0.5:
+            if random.random() < 0.4:
                 # Tạo hoàn toàn ngẫu nhiên
                 new_individual = generate_single_random_chromosome(Base_vehicleid_to_plan, route_map, id_to_vehicle, PDG_map)
             else:
-                if random.random() < 0.5:
-                    # Mutate mạnh từ elite
-                    new_individual = copy.deepcopy(random.choice(elite))
-                    intensive_mutation(new_individual, id_to_vehicle, route_map)
-                else:
-                    # Random crossover từ elite
+                # Random crossover từ elite
+                if random.random() < 0.5:    
                     parent1, parent2 = random.sample(elite, 2)
                     new_individual = parent1.crossover(parent2, PDG_map)
-                    new_mutation(new_individual, is_limited=True)
+                    intensive_mutation(new_individual, is_limited=True)
+                else:
+                    new_individual =  copy.deepcopy(random.choice(elite))
+                    #new_individual = disturbance_opt(new_individual.solution , id_to_vehicle , route_map)
+                    intensive_mutation(new_individual, is_limited=True)
             
             new_individuals.append(new_individual)
         
         return unique_population + new_individuals
-    
     return population
 
 def remove_similar_individuals(population: List[Chromosome], threshold: float = 0.1) -> List[Chromosome]:
@@ -391,11 +408,11 @@ def remove_similar_individuals(population: List[Chromosome], threshold: float = 
     
     return unique_population
 
-def intensive_mutation(individual: Chromosome, id_to_vehicle: Dict[str, Vehicle], route_map: Dict[Tuple, Tuple]):
+def intensive_mutation(individual: Chromosome , is_limited = True):
     """Mutation mạnh để tăng đa dạng"""
     # Áp dụng mutation nhiều lần
     for _ in range(random.randint(2, 5)):
-        new_mutation(individual, is_limited = False)
+        new_mutation(individual, is_limited = is_limited)
     # Recalculate fitness
     individual.fitness = individual.evaluate_fitness()
 

@@ -8,7 +8,7 @@ import math
 from algorithm.engine import *
 from algorithm.Test_algorithm.new_LS import *
 from algorithm.Test_algorithm.new_engine import *
-from algorithm.Test_algorithm.new_GA import generate_random_chromosome , calculate_diversity , calculate_fitness_diversity, calculate_chromosome_distance, new_mutation
+from algorithm.Test_algorithm.new_GA import generate_random_chromosome , calculate_chromosome_distance, new_mutation
 
 
 def new_algo_2(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tuple, Tuple], 
@@ -29,7 +29,7 @@ def new_algo_2(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict
     best_solution = population[0]
     
     # Dynamic elite size based on diversity
-    base_elite_size = max(2, config.POPULATION_SIZE // 8)  # Giảm elite size để tăng diversity
+    base_elite_size = max(2, config.POPULATION_SIZE // 5)  # Giảm elite size để tăng diversity
     
     for gen in range(config.NUMBER_OF_GENERATION):
         gen_start_time = time.time()
@@ -110,7 +110,6 @@ def calculate_diversity_fast(population: List[Chromosome]) -> float:
         return 1.0
     
     # Với 20 cá thể, sample toàn bộ thay vì 20
-    sample_size = len(population)  # Không cần sampling với population nhỏ
     sample = population
     
     total_distance = 0
