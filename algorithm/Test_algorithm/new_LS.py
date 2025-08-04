@@ -5,7 +5,7 @@ from typing import Dict , List
 import copy
 import time
 from algorithm.Object import Node, Vehicle, OrderItem , Chromosome
-from algorithm.algorithm_config import *
+import algorithm.algorithm_config as config
 from algorithm.engine import *
 from algorithm.local_search import * 
 

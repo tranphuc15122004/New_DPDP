@@ -5,17 +5,16 @@ from algorithm.In_and_Out import *
 from algorithm.Object import *
 from algorithm.engine import *
 from algorithm.Main_algorithm.GA import GA ,  GA1LS , GA5LS
-from algorithm.Main_algorithm.ACO import ACO
 from algorithm.Test_algorithm.new_engine import *
-from algorithm.Test_algorithm.new_GA import new_GA
-from algorithm.Test_algorithm.new_GA2 import new_algo_2
+from algorithm.Test_algorithm.GAVND import GAVND_1
+from algorithm.Test_algorithm.GAVND2 import GAVND_2
 import algorithm.algorithm_config as Config
 
 
 input_directory = r'algorithm\data_interaction'
 
 def main():
-    Config.BEGIN_TIME = time.time()
+    Config.set_begin_time()
     id_to_factory , route_map ,  id_to_vehicle , id_to_unlocated_items ,  id_to_ongoing_items , id_to_allorder = Input()
     deal_old_solution_file(id_to_vehicle)
 
@@ -37,7 +36,7 @@ def main():
     
     Unongoing_super_nodes , Base_vehicleid_to_plan= get_UnongoingSuperNode(vehicleid_to_plan , id_to_vehicle)
     
-    best_chromosome : Chromosome = new_GA(vehicleid_to_plan , route_map , id_to_vehicle , Unongoing_super_nodes , Base_vehicleid_to_plan)
+    best_chromosome : Chromosome = GAVND_2(vehicleid_to_plan , route_map , id_to_vehicle , Unongoing_super_nodes , Base_vehicleid_to_plan)
     if best_chromosome is None or best_chromosome.fitness > total_cost(id_to_vehicle , route_map , vehicleid_to_plan):
         best_chromosome = Chromosome(vehicleid_to_plan , route_map , id_to_vehicle)
 

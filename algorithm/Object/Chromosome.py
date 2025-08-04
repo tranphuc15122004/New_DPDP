@@ -4,7 +4,7 @@ import sys
 import time
 from typing import Dict, List, Optional, Tuple
 from algorithm.Object import *
-from algorithm.algorithm_config import *
+import algorithm.algorithm_config as config
 from algorithm.engine import dispatch_nodePair, total_cost
 from algorithm.local_search import *
 
@@ -14,6 +14,7 @@ class Chromosome:
         self.route_map = route_map
         self.id_to_vehicle = id_to_vehicle
         self.fitness = self.evaluate_fitness()
+        self.improved_LS_map = {method: 0 for method in config.LS_METHODS}
 
     def evaluate_fitness(self) -> float:
         self.fitness = total_cost(self.id_to_vehicle , self.route_map , self.solution)
@@ -28,6 +29,8 @@ class Chromosome:
         self.fitness = self.evaluate_fitness() 
 
     def crossover(self, other: 'Chromosome' , PDG_map : Dict[str , List[Node]]) -> 'Chromosome':
+        if config.is_timeout():
+            return None
         child_solution = crossover_solutions(self, other  , PDG_map)
         child_solution.fitness = child_solution.evaluate_fitness()
         return child_solution
@@ -39,7 +42,7 @@ def mutate_solution(indivisual : Chromosome , is_limited = False , is_1LS : bool
     if is_1LS:
         n1 = 0
         i  = 1
-        while i < LS_MAX:
+        while i < config.LS_MAX:
             is_improved = False
             if inter_couple_exchange(indivisual.solution , indivisual.id_to_vehicle , indivisual.route_map , is_limited):
                 n1 +=1
@@ -52,9 +55,8 @@ def mutate_solution(indivisual : Chromosome , is_limited = False , is_1LS : bool
     else:
         n1 , n2 , n3 , n4, n5 = 0 ,0 ,0 ,0 ,0
         i  = 1
-        while i < LS_MAX:
-            curr_time = time.time()
-            if curr_time - BEGIN_TIME > 60:
+        while i < config.LS_MAX:
+            if config.is_timeout():
                 break
             
             is_improved = False
@@ -87,8 +89,7 @@ def mutation_for_ACO(indivisual : Chromosome , is_limited = False):
     n1 , n2 , n3 , n4, n5 = 0 ,0 ,0 ,0 ,0
     i  = 1
     while True:
-        curr_time = time.time()
-        if curr_time - BEGIN_TIME > 60:
+        if config.is_timeout():
             break
         
         is_improved = False
@@ -163,7 +164,7 @@ def crossover_solutions(parent1: Chromosome , parent2: Chromosome , PDG_map : Di
             for node in parent1.solution[vehicleID]:
                 child_solution[vehicleID].append(node)
         else:
-            for node in parent1.solution[vehicleID]:
+            for node in parent2.solution[vehicleID]:
                 child_solution[vehicleID].append(node)
 
         # Lưu các nút thừa trong tuyến đường hiện tại
@@ -198,29 +199,38 @@ def crossover_solutions(parent1: Chromosome , parent2: Chromosome , PDG_map : Di
     # Kiem tra lai solution        
     for key, value in check_valid.items():
         if value == 0:
-            # truong hop bi thieu 1 super node thi gan theo chien luoc CI vao solution hien tai
-            selected_vehicleID = random.choice(list(parent1.id_to_vehicle.keys()))
-            node_list = new_PDG_map[key]
-            isExhausive = False
-            route_node_list : List[Node] = []
-            
-            if node_list:
-                isExhausive , bestInsertVehicleID, bestInsertPosI, bestInsertPosJ , bestNodeList = dispatch_nodePair(node_list , parent1.id_to_vehicle , child_solution , parent1.route_map ,selected_vehicleID)
+            if random.uniform(0 , 1) < 0.5:
+                # truong hop bi thieu 1 super node thi gan theo chien luoc CI vao solution hien tai
+                node_list = new_PDG_map[key]
+                isExhausive = False
+                route_node_list : List[Node] = []
                 
-            route_node_list = child_solution.get(bestInsertVehicleID , [])
+                if node_list:
+                    isExhausive , bestInsertVehicleID, bestInsertPosI, bestInsertPosJ , bestNodeList = dispatch_nodePair(node_list , parent1.id_to_vehicle , child_solution , parent1.route_map)
+                    
+                route_node_list = child_solution.get(bestInsertVehicleID , [])
 
-            if isExhausive:
-                route_node_list = bestNodeList[:]
+                if isExhausive:
+                    route_node_list = bestNodeList[:]
+                else:
+                    if route_node_list is None:
+                        route_node_list = []
+                    
+                    new_order_pickup_node = node_list[0]
+                    new_order_delivery_node = node_list[1]
+                    
+                    route_node_list.insert(bestInsertPosI, new_order_pickup_node)
+                    route_node_list.insert(bestInsertPosJ, new_order_delivery_node)
+                child_solution[bestInsertVehicleID] = route_node_list
             else:
-                if route_node_list is None:
-                    route_node_list = []
-                
-                new_order_pickup_node = node_list[0]
-                new_order_delivery_node = node_list[1]
-                
-                route_node_list.insert(bestInsertPosI, new_order_pickup_node)
-                route_node_list.insert(bestInsertPosJ, new_order_delivery_node)
-            child_solution[bestInsertVehicleID] = route_node_list
+                node_list = new_PDG_map[key]
+                if random.uniform(0 , 1) < 0.5:
+                    # Random vehicle
+                    selected_vehicleID = random.choice(list(parent1.id_to_vehicle.keys()))
+                    child_solution[selected_vehicleID].extend(node_list)
+                else:
+                    # Random dispatch
+                    random_dispatch_nodePair(node_list, parent1.id_to_vehicle, child_solution)
             
             print('Cập nhật super node còn thiếu' , file= sys.stderr)
     

@@ -1,3 +1,6 @@
+# Timeout checking utilities
+import time
+
 """Problem constant"""
 APPROACHING_DOCK_TIME = 1800
 Delta = 10000.0 / 3600.0
@@ -5,13 +8,28 @@ Delta1 = 10000.0
 SLACK_TIME_THRESHOLD = 10000
 debugPeriod = "0010-0020"
 addDelta = 300000.0
+LS_METHODS = ['PDPairExchange', 'BlockExchange', 'BlockRelocate', 'mPDG', '2opt']
 BEGIN_TIME = 0
-ALGO_TIME_LIMIT = 9*60 + 50
+ALGO_TIME_LIMIT = 9*60+30
+
+def set_begin_time():
+    """Set the start time for algorithm execution"""
+    global BEGIN_TIME
+    BEGIN_TIME = time.time()
+
+def is_timeout() -> bool:
+    """Check if algorithm has exceeded time limit"""
+    return time.time() - BEGIN_TIME > ALGO_TIME_LIMIT
+
+def get_remaining_time() -> float:
+    """Get remaining time in seconds"""
+    return max(0, ALGO_TIME_LIMIT - (time.time() - BEGIN_TIME))
+
 
 """GA configuration"""
 POPULATION_SIZE = 15
 NUMBER_OF_GENERATION = 20
-MUTATION_RATE = 1
+MUTATION_RATE = 0.5
 LS_MAX = 20
 
 """ ACO configuration """

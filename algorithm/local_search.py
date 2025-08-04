@@ -10,7 +10,8 @@ from algorithm.local_search import *
 
 
 def inter_couple_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple] , is_limited : bool = False ):    
-    if time.time() - config.BEGIN_TIME > config.ALGO_TIME_LIMIT:
+    # Kiểm tra timeout ngay từ đầu
+    if config.is_timeout():
         return False
     
     is_improved = False
@@ -69,6 +70,10 @@ def inter_couple_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehic
     idx_i = 0
     idx_j = 0
     for before_key , before_DPG in pdg_Map.items():
+        # Kiểm tra timeout trong vòng lặp ngoài
+        if config.is_timeout():
+            break
+            
         before_vehicle = id_to_vehicle.get(before_key.split(",")[0])
         before_posI = int(before_key.split(",")[1].split("+")[0])
         before_posJ = int(before_key.split(",")[1].split("+")[1])
@@ -76,6 +81,10 @@ def inter_couple_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehic
         
         idx_j = 0
         for next_key , next_DPG in pdg_Map.items():
+            # Kiểm tra timeout trong vòng lặp trong (mỗi 10 iterations để tránh overhead)
+            if idx_j % 10 == 0 and config.is_timeout():
+                break
+                
             if idx_i >= idx_j:
                 idx_j += 1
                 continue
@@ -136,7 +145,8 @@ def inter_couple_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehic
             if is_improved and is_limited:
                 break
         
-        if is_improved and is_limited:
+        # Kiểm tra timeout và early exit
+        if config.is_timeout() or (is_improved and is_limited):
             break    
         
         idx_i += 1
@@ -185,7 +195,7 @@ def inter_couple_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehic
     return is_improved
 
 def block_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple] , is_limited : bool = False):
-    if time.time() - config.BEGIN_TIME > config.ALGO_TIME_LIMIT:
+    if config.is_timeout():
         return False
     
     is_improved = False
@@ -238,6 +248,10 @@ def block_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dic
     idxJ = 0
     
     for before_key , before_block in block_map.items():
+        # Kiểm tra timeout trong vòng lặp ngoài
+        if config.is_timeout():
+            break
+            
         before_vehicle = id_to_vehicle.get(before_key.split(",")[0])
         before_posI = int(before_key.split(",")[1].split("+")[0])
         before_posJ = int(before_key.split(",")[1].split("+")[1])
@@ -245,6 +259,10 @@ def block_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dic
         
         idxJ = 0
         for next_key , next_block in block_map.items():
+            # Kiểm tra timeout trong vòng lặp trong (mỗi 10 iterations)
+            if idxJ % 10 == 0 and config.is_timeout():
+                break
+                
             if idxI >= idxJ: 
                 idxJ +=1
                 continue
@@ -319,7 +337,8 @@ def block_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dic
             if is_improved and is_limited:
                 break
             idxJ +=1
-        if is_improved and is_limited:
+        # Kiểm tra timeout và early exit
+        if config.is_timeout() or (is_improved and is_limited):
             break
         idxI +=1
     
@@ -367,7 +386,7 @@ def block_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dic
 
 
 def block_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple] , is_limited: bool = False ):
-    if time.time() - config.BEGIN_TIME > config.ALGO_TIME_LIMIT:
+    if config.is_timeout():
         return False
     
     is_improved = False
@@ -417,6 +436,10 @@ def block_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dic
     min_cost_block1_key_str:  str = None
     best_relocate_block : List[Node] = None
     for before_key , before_block in block_map.items():
+        # Kiểm tra timeout trong vòng lặp ngoài
+        if config.is_timeout():
+            break
+            
         before_vid, before_pos = before_key.split(",")
         before_post_i, before_post_j = map(int, before_pos.split("+"))
         before_vehicle = id_to_vehicle.get(before_vid)
@@ -426,6 +449,10 @@ def block_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dic
         del route_node_list1[before_post_i: before_post_i + block1_len]
         
         for index, (vehicle_id, vehicle) in enumerate(id_to_vehicle.items(), start=1):
+            # Kiểm tra timeout trong vòng lặp trong (mỗi 5 iterations)
+            if index % 5 == 0 and config.is_timeout():
+                break
+                
             vehicle_id = f"V_{index}"
             route_node_list = vehicleid_to_plan.get(vehicle_id, [])
             node_list_size = len(route_node_list)
@@ -448,7 +475,7 @@ def block_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dic
                     break
         
         route_node_list1[before_post_i:before_post_i] = before_block  # Khôi phục dữ liệu ban đầu
-        if is_improved and is_limited: 
+        if config.is_timeout() or (is_improved and is_limited): 
             break
 
     if is_improved:
@@ -467,7 +494,7 @@ def block_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dic
     return is_improved
 
 def multi_pd_group_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple] , is_limited : bool = False):
-    if time.time() - config.BEGIN_TIME > config.ALGO_TIME_LIMIT:
+    if config.is_timeout():
         return False
     
     is_improved = False
@@ -486,6 +513,10 @@ def multi_pd_group_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to_veh
     new_cost_delta = [math.inf] * ls_node_pair_num
     
     for idx, pdg in dis_order_super_node.items():
+        # Kiểm tra timeout trong quá trình xây dựng solution
+        if config.is_timeout():
+            break
+            
         if not pdg or len(pdg) == 0:
             continue
         
@@ -548,6 +579,10 @@ def multi_pd_group_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to_veh
     final_cost = -1.0
     is_improved = False
     for i in range(ls_node_pair_num):
+        # Kiểm tra timeout trong vòng lặp optimization
+        if config.is_timeout():
+            break
+            
         if new_cost_delta[i] != math.inf:
             before_super_node_map = formal_super_node[sort_index[i]]
             new_super_node_map = new_formal_super_node[sort_index[i]]
@@ -601,13 +636,18 @@ def multi_pd_group_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to_veh
 
 
 def improve_ci_path_by_2_opt(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple]  , is_limited : bool = False):
-    if time.time() - config.BEGIN_TIME > config.ALGO_TIME_LIMIT:
+    if config.is_timeout():
         return False
     
     is_improved = False
     cost0 = total_cost(id_to_vehicle , route_map , vehicleid_to_plan)
+    best_node_list : List[Node] = []
     
     for vehicleID , route_node_list in vehicleid_to_plan.items():
+        # Kiểm tra timeout cho mỗi vehicle
+        if config.is_timeout():
+            break
+        
         vehicle = id_to_vehicle.get(vehicleID)
         route_node_len = len(route_node_list) if route_node_list else 0
         if route_node_len == 0:
@@ -615,10 +655,17 @@ def improve_ci_path_by_2_opt(vehicleid_to_plan: Dict[str , List[Node]], id_to_ve
         
         begin_pos = 1 if vehicle.des else 0
         is_route_improved = False
+        original_cost = cost_of_a_route(route_node_list, vehicle, id_to_vehicle, route_map, vehicleid_to_plan)
+        min_cost = original_cost  
         
         REV : List[List[bool]] = CHECK(route_node_list , begin_pos)
         min_cost_delta = math.inf
+        
         for i in range(begin_pos, route_node_len - 3):
+            # Kiểm tra timeout trong vòng lặp ngoài
+            if config.is_timeout():
+                break
+            
             for j in range(i + 2, route_node_len):
                 # bản sao nông
                 temp_route_node_list = route_node_list[:]
@@ -644,10 +691,11 @@ def improve_ci_path_by_2_opt(vehicleid_to_plan: Dict[str , List[Node]], id_to_ve
                                 continue
                             
                             cost = cost_of_a_route(temp_route_node_list, vehicle , id_to_vehicle ,route_map , vehicleid_to_plan)
-                            if cost < min_cost_delta:
+                            if cost < min_cost:
                                 print("tried case 1 improved", file= sys.stderr  )
-                                min_cost_delta = cost
+                                min_cost = cost
                                 best_node_list = temp_route_node_list[:]
+                                is_route_improved = True
                     elif pos_k <= j:
                         break
                 
@@ -669,10 +717,11 @@ def improve_ci_path_by_2_opt(vehicleid_to_plan: Dict[str , List[Node]], id_to_ve
                         
                         cost = cost_of_a_route(temp_route_node_list, vehicle , id_to_vehicle , route_map , vehicleid_to_plan)
                         
-                        if cost < min_cost_delta:
+                        if cost < min_cost:
                             print("tried case 2 improved" , file= sys.stderr )
-                            min_cost_delta = cost
+                            min_cost = cost
                             best_node_list = temp_route_node_list[:]
+                            is_route_improved = True
                 
                 if k >= j:
                     continue
@@ -692,21 +741,27 @@ def improve_ci_path_by_2_opt(vehicleid_to_plan: Dict[str , List[Node]], id_to_ve
                     
                     cost = cost_of_a_route(temp_route_node_list, vehicle , id_to_vehicle , route_map , vehicleid_to_plan)
                     
-                    if cost < min_cost_delta:
+                    if cost < min_cost:
                         print("tried case 4 improved", file= sys.stderr  )
-                        min_cost_delta = cost
+                        min_cost = cost
                         best_node_list = temp_route_node_list[:]
+                        is_route_improved = True
+                
+                #dung som neu tim dc cach dao tot hon
+                if is_route_improved and is_limited:
+                    break
+            
+            if is_route_improved and is_limited:
+                    break
         
-        if min_cost_delta < cost0 :
-            is_improved = True
-            is_route_improved = True
-        if is_route_improved:
+        if is_route_improved and best_node_list is not None:
             vehicleid_to_plan[vehicleID] = best_node_list
-        if is_improved and is_route_improved and is_limited:
+            is_improved = True
+        
+        if is_improved and is_limited:
             break
-        endtime = time.time()
-        usedtime = (endtime - config.BEGIN_TIME)
-        if usedtime > config.ALGO_TIME_LIMIT:
-            print("TimeOut !!!!!!!!!!!!!!" )
+        if config.is_timeout():
+            print('Timeout at 2opt !!!!!!!!!!')
             return is_improved
+    
     return is_improved
