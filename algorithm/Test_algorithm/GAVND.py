@@ -5,7 +5,7 @@ import random
 from algorithm.engine import *
 from algorithm.Test_algorithm.new_LS import *
 from algorithm.Test_algorithm.new_engine import *
-
+import multiprocessing
 
 def GAVND_1(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tuple, Tuple], 
             id_to_vehicle: Dict[str, Vehicle], Unongoing_super_nodes: Dict[int, Dict[str, Node]], 
@@ -20,8 +20,7 @@ def GAVND_1(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
     stagnant_generations = 0
     population.sort(key=lambda x: x.fitness)
     best_solution = population[0]
-    is_diverse_turn = False
-    min_diversity = 0.1
+    min_diversity = 0.15
     # Elite size
     elite_size = max(2, config.POPULATION_SIZE // 5)
     
@@ -34,45 +33,38 @@ def GAVND_1(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
         
         gen_start_time = time.time()  # Bắt đầu generation
         
-        new_population = []
-        
-        # Elitism - giữ lại elite
-        population.sort(key=lambda x: x.fitness)
-        new_population = population[:elite_size]
-
-        # Tạo con
-        while len(new_population) < config.POPULATION_SIZE:
-            parent1, parent2 = select_parents(population)
-            child = parent1.crossover(parent2, PDG_map)
-            new_population.append(child)
-
-        population = new_population
-        
         diversity = calculate_diversity(population)
-        fitness_diversity = calculate_fitness_diversity(population)
-        if diversity < min_diversity or fitness_diversity < min_diversity:
-            is_diverse_turn = True
-        
-        if is_diverse_turn:
-            population = maintain_diversity(population, id_to_vehicle, route_map, Base_vehicleid_to_plan, PDG_map , 0.1)
-            is_diverse_turn = False
+        if diversity < min_diversity:
+            population = maintain_diversity(population, id_to_vehicle, route_map, Base_vehicleid_to_plan, PDG_map , min_diversity)
         else:
+            new_population = []
+            
+            # Elitism - giữ lại elite
+            population.sort(key=lambda x: x.fitness)
+            new_population = population[:elite_size]
+
+            # Tạo con
+            while len(new_population) < config.POPULATION_SIZE:
+                parent1, parent2 = select_parents(population)
+                child = parent1.crossover(parent2, PDG_map)
+                new_population.append(child)
+            population = new_population
+
             for c in population:
-                new_mutation(c , True)
-        
-        # Duy trì đa dạng mỗi thế hệ
-        #population = maintain_diversity(population, id_to_vehicle, route_map, Base_vehicleid_to_plan, PDG_map , 0.1)
+                if random.random() < 1: 
+                    new_mutation(c , False , 1)
         
         # Sắp xếp lại quần thể
         population.sort(key=lambda x: x.fitness)
+        population = population[:config.POPULATION_SIZE]
+        new_mutation(best_solution , False , 1)
 
         # Cập nhật best solution
         if best_solution is None or population[0].fitness < best_solution.fitness:
-            best_solution = population[0]
+            best_solution = copy.deepcopy(population[0])
             stagnant_generations = 0
         else:
             stagnant_generations += 1
-
         
         diversity = calculate_diversity(population)
         fitness_diversity = calculate_fitness_diversity(population)
@@ -84,7 +76,7 @@ def GAVND_1(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
             f'FitDiv = {fitness_diversity:.3f}')
 
         # Điều kiện dừng
-        if stagnant_generations >= 7:
+        if stagnant_generations >= 10:
             print("Stopping early due to lack of improvement.")
             break
 
@@ -142,7 +134,10 @@ def select_parents(population: List[Chromosome]) -> Tuple[Chromosome, Chromosome
         return roulette_wheel_selection(), roulette_wheel_selection()
 
 
-def new_mutation(indivisual: Chromosome, is_limited=False):
+def new_mutation(indivisual: Chromosome, is_limited=True , mode = 1):
+    if config.is_timeout():
+        return copy.deepcopy(indivisual)
+    
     i = 1
     
     # Dictionary các phương pháp Local Search
@@ -157,53 +152,75 @@ def new_mutation(indivisual: Chromosome, is_limited=False):
     # Counter cho từng phương pháp
     counters = {name: 0 for name in methods.keys()}
     
-    # Lấy danh sách tên phương pháp và trộn ngẫu nhiên cho mỗi iteration
-    method_names = list(methods.keys())
-    random.shuffle(method_names)
+    # Lấy thứ tự adaptive
+    method_names = get_adaptive_order(indivisual , methods , mode=mode)
+    
+    #  Track local search timings per method
+    ls_timings = {
+        'PDPairExchange': 0.0,
+        'BlockExchange': 0.0,
+        'BlockRelocate': 0.0,
+        'mPDG': 0.0,
+        '2opt': 0.0
+    }
     
     while i < config.LS_MAX:
         if config.is_timeout():
-            return False
-
-        is_improved = False
+            break
         
+        #  Time each local search method execution
+        ls_start = time.time()
         if methods[method_names[0]]():
+            ls_timings[method_names[0]] += time.time() - ls_start
             i += 1
             counters[method_names[0]] += 1
-            is_improved = True
             continue
+        ls_timings[method_names[0]] += time.time() - ls_start
         
+        ls_start = time.time()
         if methods[method_names[1]]():
+            ls_timings[method_names[1]] += time.time() - ls_start
             i += 1
             counters[method_names[1]] += 1
-            is_improved = True
             continue
+        ls_timings[method_names[1]] += time.time() - ls_start
         
+        ls_start = time.time()
         if methods[method_names[2]]():
+            ls_timings[method_names[2]] += time.time() - ls_start
             i += 1
             counters[method_names[2]] += 1
-            is_improved = True
             continue
+        ls_timings[method_names[2]] += time.time() - ls_start
         
+        ls_start = time.time()
         if methods[method_names[3]]():
+            ls_timings[method_names[3]] += time.time() - ls_start
             i += 1
             counters[method_names[3]] += 1
-            is_improved = True
             continue
+        ls_timings[method_names[3]] += time.time() - ls_start
         
+        ls_start = time.time()
         if methods[method_names[4]]():
+            ls_timings[method_names[4]] += time.time() - ls_start
             i += 1
             counters[method_names[4]] += 1
-            is_improved = True
             continue
+        ls_timings[method_names[4]] += time.time() - ls_start
         
-        if is_improved:
-            i += 0
-        else:
-            break
-    indivisual.fitness = indivisual.evaluate_fitness()
-    print(f"PDPairExchange:{counters['PDPairExchange']}; BlockExchange:{counters['BlockExchange']}; BlockRelocate:{counters['BlockRelocate']}; mPDG:{counters['mPDG']}; 2opt:{counters['2opt']}; cost:{total_cost(indivisual.id_to_vehicle, indivisual.route_map, indivisual.solution):.2f}", file=sys.stderr)
-
+        # No improvement found
+        break
+    #indivisual.fitness = indivisual.evaluate_fitness()
+    for method_name in methods.keys():
+        indivisual.improved_LS_map[method_name] += counters[method_name]
+    
+    #  Enhanced logging with detailed timing information
+    total_ls_time = sum(ls_timings.values())
+    timing_details = " | ".join([f"{name}:{counters[name]}({ls_timings[name]:.3f}s)" for name in method_names])
+    print(f"LS: {timing_details} | TotalTime:{total_ls_time:.3f}s | Cost:{total_cost(indivisual.id_to_vehicle, indivisual.route_map, indivisual.solution):.2f}", file=sys.stderr)
+    return copy.deepcopy(indivisual)
+    
 def maintain_diversity(population: List[Chromosome], 
                     id_to_vehicle: Dict[str, Vehicle],
                     route_map: Dict[Tuple, Tuple],
@@ -218,8 +235,6 @@ def maintain_diversity(population: List[Chromosome],
     diversity = calculate_diversity(population)
     fitness_diversity = calculate_fitness_diversity(population)
     
-    print(f"Current diversity: {diversity:.3f}, Fitness diversity: {fitness_diversity:.3f}", file=sys.stderr)
-    
     # Nếu độ đa dạng quá thấp
     if diversity < min_diversity or fitness_diversity < min_diversity:
         print("Low diversity detected, applying diversity maintenance...")
@@ -233,14 +248,12 @@ def maintain_diversity(population: List[Chromosome],
         
         # Loại bỏ các cá thể quá giống nhau
         unique_population = remove_similar_individuals(elite, threshold=0.1)
-        for c in unique_population:
-            new_mutation(c , True)
         
         # Tạo cá thể mới để bù đắp
         new_individuals = []
         needed = config.POPULATION_SIZE - len(unique_population)
         
-        for _ in range(needed):
+        for i in range(needed):
             if config.is_timeout():
                 print(f"Timeout during creating new individuals, created {i}/{needed}", file=sys.stderr)
                 break
@@ -254,13 +267,15 @@ def maintain_diversity(population: List[Chromosome],
                 if random.random() < 0.5 and len(unique_population) > 2:
                     parent1, parent2 = random.sample(elite, 2)
                     new_individual = parent1.crossover(parent2, PDG_map)
-                    new_mutation(new_individual, is_limited=True)
                 else:
-                    new_individual =  copy.deepcopy(random.choice(unique_population))
-                    #new_individual = disturbance_opt(new_individual.solution , id_to_vehicle , route_map)
-                    new_mutation(new_individual, is_limited=True)
-            
+                    parent1 = random.sample(population , 1)[0]
+                    new_individual = copy.deepcopy(parent1)
+                
             new_individuals.append(new_individual)
         
-        return unique_population + new_individuals
+        res_population = unique_population + new_individuals
+        for c in res_population:
+            if random.random() < config.MUTATION_RATE:
+                new_mutation(c , False , 2)
+        return res_population
     return population

@@ -8,6 +8,8 @@ from algorithm.Main_algorithm.GA import GA ,  GA1LS , GA5LS
 from algorithm.Test_algorithm.new_engine import *
 from algorithm.Test_algorithm.GAVND import GAVND_1
 from algorithm.Test_algorithm.GAVND2 import GAVND_2
+from algorithm.Test_algorithm.GAVND3 import GAVND_3
+
 import algorithm.algorithm_config as Config
 
 
@@ -36,7 +38,7 @@ def main():
     
     Unongoing_super_nodes , Base_vehicleid_to_plan= get_UnongoingSuperNode(vehicleid_to_plan , id_to_vehicle)
     
-    best_chromosome : Chromosome = GAVND_2(vehicleid_to_plan , route_map , id_to_vehicle , Unongoing_super_nodes , Base_vehicleid_to_plan)
+    best_chromosome : Chromosome = GAVND_3(vehicleid_to_plan , route_map , id_to_vehicle , Unongoing_super_nodes , Base_vehicleid_to_plan)
     if best_chromosome is None or best_chromosome.fitness > total_cost(id_to_vehicle , route_map , vehicleid_to_plan):
         best_chromosome = Chromosome(vehicleid_to_plan , route_map , id_to_vehicle)
 

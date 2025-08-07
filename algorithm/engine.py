@@ -1037,7 +1037,6 @@ def total_cost(id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tupl
     dock_table: Dict[str, List[List[int]]] = {}
     n: int = 0
     vehicle_num: int = len(id_to_vehicle)
-
     curr_node: List[int] = [0] * vehicle_num
     curr_time: List[int] = [0] * vehicle_num
     leave_last_node_time: List[int] = [0] * vehicle_num
@@ -1099,7 +1098,7 @@ def total_cost(id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tupl
             curr_time[index] = math.inf
             n_node[index] = 0
         index += 1
-        
+    
     while n > 0:
         minT = math.inf
         minT2VehicleIndex = 0

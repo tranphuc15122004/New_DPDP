@@ -13,26 +13,33 @@ class Chromosome:
         self.solution = vehicleid_to_plan
         self.route_map = route_map
         self.id_to_vehicle = id_to_vehicle
-        self.fitness = self.evaluate_fitness()
+        #self.fitness = self.evaluate_fitness()
         self.improved_LS_map = {method: 0 for method in config.LS_METHODS}
 
-    def evaluate_fitness(self) -> float:
+
+    @property
+    def fitness(self) -> float:
+        """Tự động tính toán fitness mỗi khi truy cập"""
+        return total_cost(self.id_to_vehicle, self.route_map, self.solution)
+
+    
+    """ def evaluate_fitness(self) -> float:
         self.fitness = total_cost(self.id_to_vehicle , self.route_map , self.solution)
         return self.fitness
-
+ """
     def mutate(self  ,is_limited = False , is_1LS : bool = False):
         mutate_solution(self , is_limited  , is_1LS)
-        self.fitness = self.evaluate_fitness()
+        #self.fitness = self.evaluate_fitness()
 
     def mutate_for_ACO(self  ,is_limited = False):
         mutation_for_ACO(self , is_limited )
-        self.fitness = self.evaluate_fitness() 
+        #self.fitness = self.evaluate_fitness() 
 
     def crossover(self, other: 'Chromosome' , PDG_map : Dict[str , List[Node]]) -> 'Chromosome':
         if config.is_timeout():
             return None
         child_solution = crossover_solutions(self, other  , PDG_map)
-        child_solution.fitness = child_solution.evaluate_fitness()
+        #child_solution.fitness = child_solution.evaluate_fitness()
         return child_solution
 
     def __repr__(self):

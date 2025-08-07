@@ -509,6 +509,6 @@ def new_crossover(parent1: Chromosome , parent2: Chromosome , PDG_map : Dict[str
             
             print('Cập nhật super node còn thiếu' , file= sys.stderr)
     
-    child_1.fitness = child_1.evaluate_fitness()
-    child_2.fitness = child_2.evaluate_fitness()
+    #child_1.fitness = child_1.evaluate_fitness()
+    #child_2.fitness = child_2.evaluate_fitness()
     return child_1 , child_2

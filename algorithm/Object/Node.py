@@ -17,7 +17,10 @@ class Node:
         self.leave_time = leave_time if leave_time is not None else 0
         self.lng = lng
         self.lat = lat
-        self.service_time = self.__calculate_service_time()
+    
+    @property
+    def service_time(self) -> int:
+        return self.__calculate_service_time()
         
     def __str__(self):
         return (f"Node {self.id}:\n"
