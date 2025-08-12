@@ -11,7 +11,7 @@ def GAVND_3(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
             id_to_vehicle: Dict[str, Vehicle], Unongoing_super_nodes: Dict[int, Dict[str, Node]], 
             Base_vehicleid_to_plan: Dict[str, List[Node]]) -> Chromosome:
     
-    population, PDG_map = generate_random_chromosome(initial_vehicleid_to_plan, route_map, id_to_vehicle, Unongoing_super_nodes, Base_vehicleid_to_plan, config.POPULATION_SIZE)
+    population, PDG_map = new_generate_random_chromosome(initial_vehicleid_to_plan, route_map, id_to_vehicle, Unongoing_super_nodes, Base_vehicleid_to_plan, config.POPULATION_SIZE)
 
     if population is None:
         print('Cant initialize the population')
@@ -26,6 +26,7 @@ def GAVND_3(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
     
     for gen in range(config.NUMBER_OF_GENERATION):
         # Kiểm tra timeout
+        begin_gen_time = time.time()
         if config.is_timeout():
             elapsed_time = time.time() - config.BEGIN_TIME
             print(f"TimeOut!! Elapsed: {elapsed_time:.1f}s")
@@ -34,6 +35,8 @@ def GAVND_3(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
         diversity = calculate_diversity(population)
         if diversity < min_diversity:
             population = maintain_diversity(population, id_to_vehicle, route_map, Base_vehicleid_to_plan, PDG_map )
+            population.sort(key=lambda x: x.fitness)
+            if population[0].fitness < best_solution.fitness: config.IMPROVED_IN_DIVER += 1
         else:
             new_population = []
             
@@ -44,20 +47,29 @@ def GAVND_3(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
             # Tạo con
             while len(new_population) < config.POPULATION_SIZE:
                 parent1, parent2 = select_parents(population)
-                child1 , child2 = new_crossover(parent1 , parent2 , PDG_map)
+                if parent1 and parent2:
+                    child1 , child2 = new_crossover(parent1 , parent2 , PDG_map , False)
+                else:
+                    break
                 if child1: new_population.append(child1)
                 if child2: new_population.append(child2)
-            
+            if config.is_timeout():
+                break
             population = new_population
             
-            for c in population:
-                if random.random() < 1: 
-                    randon_1_LS(c , False)
+            population.sort(key=lambda x: x.fitness)
+            if population[0].fitness < best_solution.fitness: config.IMPROVED_IN_CROSS += 1
+            
+            
+            for c in range(len(population) // 2):
+                randon_1_LS(population[c] , False , 0)
+            population.sort(key=lambda x: x.fitness)
+            if population[0].fitness < best_solution.fitness: config.IMPROVED_IN_MUTATION += 1
         
-        # Sắp xếp lại quần thể
+        # Sắp xếp lại quần thể.
         population.sort(key=lambda x: x.fitness)
         population = population[:config.POPULATION_SIZE]
-        #adaptive_LS_stategy(best_solution , False , 1)
+        
         
         # Cập nhật best solution
         if best_solution is None or population[0].fitness < best_solution.fitness:
@@ -73,7 +85,7 @@ def GAVND_3(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
             f'Worst = {population[-1].fitness:.2f}, '
             f'Avg = {sum([c.fitness for c in population]) / len(population):.2f}, '
             f'Diversity = {diversity:.3f}, '
-            f'FitDiv = {fitness_diversity:.3f}')
+            f'FitDiv = {fitness_diversity:.3f} , Time: {time.time() - begin_gen_time}')
 
         # Điều kiện dừng
         if stagnant_generations >= 7:
@@ -91,7 +103,7 @@ def GAVND_3(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
         estimated_next_gen_time = avg_gen_time
         
         # Kiểm tra timeout
-        if elapsed_time + estimated_next_gen_time > config.ALGO_TIME_LIMIT:
+        if elapsed_time  > config.ALGO_TIME_LIMIT:
             print(f"TimeOut!! Elapsed: {elapsed_time:.1f}s, Estimated next gen: {estimated_next_gen_time:.1f}s")
             break
 
@@ -172,6 +184,9 @@ def adaptive_LS_stategy(indivisual: Chromosome, is_limited=True , mode = 1):
             continue
         ls_timings[method_names[0]] += time.time() - ls_start
         
+        if config.is_timeout():
+            break
+        
         ls_start = time.time()
         if methods[method_names[1]]():
             ls_timings[method_names[1]] += time.time() - ls_start
@@ -179,6 +194,9 @@ def adaptive_LS_stategy(indivisual: Chromosome, is_limited=True , mode = 1):
             counters[method_names[1]] += 1
             continue
         ls_timings[method_names[1]] += time.time() - ls_start
+        
+        if config.is_timeout():
+            break
         
         ls_start = time.time()
         if methods[method_names[2]]():
@@ -188,6 +206,9 @@ def adaptive_LS_stategy(indivisual: Chromosome, is_limited=True , mode = 1):
             continue
         ls_timings[method_names[2]] += time.time() - ls_start
         
+        if config.is_timeout():
+            break
+        
         ls_start = time.time()
         if methods[method_names[3]]():
             ls_timings[method_names[3]] += time.time() - ls_start
@@ -195,6 +216,9 @@ def adaptive_LS_stategy(indivisual: Chromosome, is_limited=True , mode = 1):
             counters[method_names[3]] += 1
             continue
         ls_timings[method_names[3]] += time.time() - ls_start
+        
+        if config.is_timeout():
+            break
         
         ls_start = time.time()
         if methods[method_names[4]]():
@@ -235,7 +259,7 @@ def maintain_diversity(population: List[Chromosome],
     elite = population[:elite_size]
     
     # Loại bỏ các cá thể quá giống nhau
-    unique_population = remove_similar_individuals(elite, threshold=0.1)
+    unique_population = remove_similar_individuals(elite, threshold=0.0)
     
     # Tạo cá thể mới để bù đắp
     new_individuals = []
@@ -250,26 +274,28 @@ def maintain_diversity(population: List[Chromosome],
         new_individual = None
         if random.random() < 0.5:
             # Tạo hoàn toàn ngẫu nhiên
-            new_individual = generate_single_random_chromosome(Base_vehicleid_to_plan, route_map, id_to_vehicle, PDG_map)
+            #new_individual = generate_single_random_chromosome(Base_vehicleid_to_plan, route_map, id_to_vehicle, PDG_map)
+            new_individual = disturbance_opt(elite[0].solution , id_to_vehicle , route_map , 0.3)
+            new_individuals.append(new_individual)
         else:
             # Random crossover từ elite
             if random.random() < 0.5 and len(unique_population) > 2:
-                while new_individual is None:
-                    parent1, parent2 = random.sample(elite, 2)
-                    child1 , child2 = new_crossover(parent1 , parent2 , PDG_map)
+                while True:
+                    parent1, parent2 = random.sample(unique_population, 2)
+                    child1 , child2 = new_crossover(parent1 , parent2 , PDG_map,  False)
                     if child2 and child1:
-                        new_individual = child1 if child1.fitness < child2.fitness else child2
+                        break
+                new_individuals.append(child1)
+                new_individuals.append(child2)
             else:
                 parent1 = random.sample(population , 1)[0]
                 new_individual = copy.deepcopy(parent1)
-        
-        randon_1_LS(new_individual , is_limited= False , mode= 0)
-        new_individuals.append(new_individual)
-    
+                new_individuals.append(new_individual)
+
     res_population = unique_population + new_individuals
     res_population.sort(key=lambda x: x.fitness)
     
-    for i in range (5):
-        adaptive_LS_stategy(res_population[i] , False , 1)
+    for i in range (len(res_population) // 4):
+        adaptive_LS_stategy(res_population[i] , True , 1)
     
     return res_population

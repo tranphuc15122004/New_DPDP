@@ -38,7 +38,8 @@ def main():
     
     Unongoing_super_nodes , Base_vehicleid_to_plan= get_UnongoingSuperNode(vehicleid_to_plan , id_to_vehicle)
     
-    best_chromosome : Chromosome = GAVND_3(vehicleid_to_plan , route_map , id_to_vehicle , Unongoing_super_nodes , Base_vehicleid_to_plan)
+    copy_vehicleid_to_plan = copy.deepcopy(vehicleid_to_plan)
+    best_chromosome : Chromosome = GAVND_3(copy_vehicleid_to_plan , route_map , id_to_vehicle , Unongoing_super_nodes , Base_vehicleid_to_plan)
     if best_chromosome is None or best_chromosome.fitness > total_cost(id_to_vehicle , route_map , vehicleid_to_plan):
         best_chromosome = Chromosome(vehicleid_to_plan , route_map , id_to_vehicle)
 
@@ -48,10 +49,12 @@ def main():
     print(f'The fitness value before EA: {total_cost(id_to_vehicle , route_map , vehicleid_to_plan)}')
     print(get_route_after(best_chromosome.solution , {}))
     print(f'The fitness value after EA: {best_chromosome.fitness}')
+    print()
     
     #Ket thuc thuat toan
     
     used_time = time.time() - Config.BEGIN_TIME
+    print('Thoi gian thuc hien thuat toan: ' , used_time)
     update_solution_json(id_to_ongoing_items , id_to_unlocated_items , id_to_vehicle , best_chromosome.solution , vehicleid_to_destination , route_map , used_time)
     
     merge_node(id_to_vehicle , best_chromosome.solution)

@@ -139,8 +139,7 @@ def Improve_by_relocate_delay_order(vehicleid_to_plan: Dict[str , List[Node]], i
     
     return is_improved
 
-def disturbance_opt(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple]):
-
+def disturbance_opt(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple] , relocate_rate = 0.3):
     new_vehicle_to_plan : Dict[str , List[Node]] = {}
     for VID , plan in vehicleid_to_plan.items():
         new_vehicle_to_plan[VID] = []
@@ -150,7 +149,7 @@ def disturbance_opt(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Di
     dis_order_super_node,  _ = get_UnongoingSuperNode(vehicleid_to_plan , id_to_vehicle)
     ls_node_pair_num = len(dis_order_super_node)
     if ls_node_pair_num == 0:
-        return False
+        return None
     
     pdg_Map : Dict[str , List[Node]] = {}
     
@@ -182,11 +181,11 @@ def disturbance_opt(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Di
             pdg_Map[k] = node_list
             
     if len(pdg_Map) < 2:
-        return False
+        return None
     
     # khoảng 30% cơ hội một cặp node sẽ được gán lại
     # Đánh dấu các cặp node sẽ được gán
-    num_pairs_to_relocate = max(1, int(len(pdg_Map) * 0.3))
+    num_pairs_to_relocate = max(1, int(len(pdg_Map) * relocate_rate))
     pairs_to_relocate = random.sample(list(pdg_Map.keys()), num_pairs_to_relocate)
     
     # Lưu trữ các cặp node sẽ được gán lại

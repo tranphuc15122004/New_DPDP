@@ -761,7 +761,7 @@ def improve_ci_path_by_2_opt(vehicleid_to_plan: Dict[str , List[Node]], id_to_ve
         if is_improved and is_limited:
             break
         if config.is_timeout():
-            print('Timeout at 2opt !!!!!!!!!!')
+            print('Timeout at 2opt !!!!!!!!!!' , file= sys.stderr)
             return is_improved
     
     return is_improved

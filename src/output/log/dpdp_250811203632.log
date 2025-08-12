@@ -1,0 +1,28 @@
+2025-08-11 20:36:32,706 [main.py         | 48] INFO: Start to run instance_12
+2025-08-11 20:36:32,706 [simulate_api.py | 60] INFO: Start time of the simulator: 2025-08-11 00:00:00, time interval:  600.00
+2025-08-11 20:36:32,730 [input_utils.py  | 48] INFO: Get 154 factories
+2025-08-11 20:36:33,516 [input_utils.py  | 52] INFO: Get 23562 routes
+2025-08-11 20:36:33,540 [input_utils.py  | 57] INFO: Get 5 vehicles
+2025-08-11 20:36:33,550 [input_utils.py  | 61] INFO: Get 100 orders
+2025-08-11 20:36:33,550 [simulate_api.py | 87] INFO: Initial position of V_1 is e2d5093fbe36431f8986ddb0e1c586be
+2025-08-11 20:36:33,551 [simulate_api.py | 87] INFO: Initial position of V_2 is 7fe14b93f0f04ee7a994ef5b2c1fdb72
+2025-08-11 20:36:33,551 [simulate_api.py | 87] INFO: Initial position of V_3 is fa366fc87a124d32926daa5bb093129f
+2025-08-11 20:36:33,551 [simulate_api.py | 87] INFO: Initial position of V_4 is e47399648fa842b2b8f80094343d8091
+2025-08-11 20:36:33,551 [simulate_api.py | 87] INFO: Initial position of V_5 is becb4f85393540b287e7329758b8d832
+2025-08-11 20:36:33,551 [simulate_environment.py | 99] INFO: **************************************************
+2025-08-11 20:36:33,551 [simulate_environment.py | 103] INFO: cur time: 2025-08-11 00:10:00, pre time: 2025-08-11 00:00:00
+2025-08-11 20:36:33,551 [simulate_environment.py | 140] INFO: Start to update the input of 2025-08-11 00:10:00
+2025-08-11 20:36:33,551 [simulate_environment.py | 167] INFO: Get 0 unallocated order items, 0 ongoing order items, 0 completed order items
+2025-08-11 20:36:34,884 [simulate_environment.py | 232] INFO: 
+Cant initialize the population
+
+The solution initialized by Cheapest Insertion:
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[]
+The fitness value before EA: 0.0
+V_1:[] V_2:[] V_3:[] V_4:[] V_5:[]
+The fitness value after EA: 0.0
+
+Thoi gian thuc hien thuat toan:  0.7542934417724609
+SUCCESS
+
+2025-08-11 20:36:34,884 [simulate_environment.py | 243] ERROR: Output_json files from the algorithm is not the newest.

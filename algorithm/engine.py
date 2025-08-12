@@ -6,9 +6,10 @@ import os
 import random
 import re
 import sys
-from algorithm.algorithm_config import *
 from typing import Dict , List, Optional, Tuple
 from algorithm.Object import *
+import algorithm.algorithm_config as config
+
 
 input_directory = r'algorithm\data_interaction'
 
@@ -49,6 +50,10 @@ def restore_scene_with_single_node(vehicleid_to_plan: Dict[str , List[Node]], id
                 last_unallocated_items : List[str] = before_solution.get("unallocated_order_items", "").split()
                 curr_unallocated_items : List[str] = unallocatedOrderItems.split(" ")
                 newOrderItems = ' '.join([item for item in curr_unallocated_items if item not in last_unallocated_items]).strip()
+                
+                config.IMPROVED_IN_CROSS = int(before_solution.get("improved_in_cross" , 0))
+                config.IMPROVED_IN_MUTATION  = int(before_solution.get("improved_in_mutation" , 0))
+                config.IMPROVED_IN_DIVER  = int(before_solution.get("improved_in_diver" , 0))
                 
                 for route in splited_routeBefore:
                     if not route or len(route) < 3:
@@ -162,6 +167,9 @@ def update_solution_json (id_to_ongoing_items: Dict[str , OrderItem] , id_to_unl
     route_before = ""
     route_after = ""
     solution_json_obj = {}
+    improved_in_cross = config.IMPROVED_IN_CROSS
+    improved_in_mutation = config.IMPROVED_IN_MUTATION
+    improved_in_diver = config.IMPROVED_IN_DIVER
 
     on_vehicle_order_items = " ".join(id_to_ongoing_items.keys()).strip()
 
@@ -200,7 +208,10 @@ def update_solution_json (id_to_ongoing_items: Dict[str , OrderItem] , id_to_unl
             "new_order_items": unallocated_order_items,
             "used_time": used_time,
             "route_before": route_before,
-            "route_after": route_after
+            "route_after": route_after,
+            "improved_in_cross": improved_in_cross,
+            "improved_in_mutation": improved_in_mutation,
+            "improved_in_diver": improved_in_diver
         }
     else:
         try:
@@ -241,7 +252,10 @@ def update_solution_json (id_to_ongoing_items: Dict[str , OrderItem] , id_to_unl
             "new_order_items": new_order_items,
             "used_time": used_time,
             "route_before": route_before,
-            "route_after": route_after
+            "route_after": route_after,
+            "improved_in_cross": improved_in_cross,
+            "improved_in_mutation": improved_in_mutation,
+            "improved_in_diver": improved_in_diver
         }
 
     # Ghi dữ liệu ra file JSON
@@ -569,11 +583,11 @@ def dispatch_nodePair(node_list: list[Node]  , id_to_vehicle: Dict[str , Vehicle
                     bestInsertVehicleID = vehicleID
                     bestNodeList = exhaustive_route_node_list[:]
             elif model_nodes_num == 4:
-                for i in range(len(modle4)):
+                for i in range(len(config.modle4)):
                     if empty_pos_num == 1:
-                        if modle4[i][0] == 0:
+                        if config.modle4[i][0] == 0:
                             for j in range(1, 4):
-                                exhaustive_route_node_list.append(modle_node_list[modle4[i][j] - 1])
+                                exhaustive_route_node_list.append(modle_node_list[config.modle4[i][j] - 1])
 
                             costValue = cost_of_a_route(exhaustive_route_node_list, vehicle , id_to_vehicle , route_map , vehicleid_to_plan , mode)
 
@@ -585,7 +599,7 @@ def dispatch_nodePair(node_list: list[Node]  , id_to_vehicle: Dict[str , Vehicle
                             del exhaustive_route_node_list[-3:]
                     else:
                         for j in range(4):
-                            exhaustive_route_node_list.append(modle_node_list[modle4[i][j]])
+                            exhaustive_route_node_list.append(modle_node_list[config.modle4[i][j]])
 
                         costValue = cost_of_a_route(exhaustive_route_node_list, vehicle , id_to_vehicle , route_map , vehicleid_to_plan, mode)
 
@@ -596,11 +610,11 @@ def dispatch_nodePair(node_list: list[Node]  , id_to_vehicle: Dict[str , Vehicle
                             isExhausive = True
                         del exhaustive_route_node_list[-4:]
             elif model_nodes_num == 6:
-                for i in range(len(modle6)):
+                for i in range(len(config.modle6)):
                     if empty_pos_num == 1:
-                        if modle6[i][0] == 0:
+                        if config.modle6[i][0] == 0:
                             for j in range(1, 6):
-                                exhaustive_route_node_list.append(modle_node_list[modle6[i][j] - 1])
+                                exhaustive_route_node_list.append(modle_node_list[config.modle6[i][j] - 1])
                             costValue = cost_of_a_route(exhaustive_route_node_list, vehicle , id_to_vehicle , route_map , vehicleid_to_plan, mode)
                             if costValue < minCostDelta:
                                 minCostDelta = costValue
@@ -609,9 +623,9 @@ def dispatch_nodePair(node_list: list[Node]  , id_to_vehicle: Dict[str , Vehicle
                                 isExhausive = True
                             del exhaustive_route_node_list[-5:]
                     elif empty_pos_num == 2:
-                        if modle6[i][0] == 0 and modle6[i][1] == 1:
+                        if config.modle6[i][0] == 0 and config.modle6[i][1] == 1:
                             for j in range(2, 6):
-                                exhaustive_route_node_list.append(modle_node_list[modle6[i][j] - 2])
+                                exhaustive_route_node_list.append(modle_node_list[config.modle6[i][j] - 2])
                             costValue = cost_of_a_route(exhaustive_route_node_list, vehicle ,id_to_vehicle ,route_map , vehicleid_to_plan , mode)
                             if costValue < minCostDelta:
                                 minCostDelta = costValue
@@ -621,7 +635,7 @@ def dispatch_nodePair(node_list: list[Node]  , id_to_vehicle: Dict[str , Vehicle
                             del exhaustive_route_node_list[-4:]
                     else:
                         for j in range(6):
-                            exhaustive_route_node_list.append(modle_node_list[modle6[i][j]])
+                            exhaustive_route_node_list.append(modle_node_list[config.modle6[i][j]])
                         costValue = cost_of_a_route(exhaustive_route_node_list, vehicle , id_to_vehicle , route_map, vehicleid_to_plan, mode)
                         if costValue < minCostDelta:
                             minCostDelta = costValue
@@ -630,11 +644,11 @@ def dispatch_nodePair(node_list: list[Node]  , id_to_vehicle: Dict[str , Vehicle
                             isExhausive = True
                         del exhaustive_route_node_list[-6:]
             elif model_nodes_num == 8:
-                for i in range(len(modle8)):
+                for i in range(len(config.modle8)):
                     if empty_pos_num == 1:
-                        if modle8[i][0] == 0:
+                        if config.modle8[i][0] == 0:
                             for j in range(1, 8):
-                                exhaustive_route_node_list.append(modle_node_list[modle8[i][j] - 1])
+                                exhaustive_route_node_list.append(modle_node_list[config.modle8[i][j] - 1])
                             costValue = cost_of_a_route(exhaustive_route_node_list, vehicle , id_to_vehicle , route_map, vehicleid_to_plan, mode)
                             if costValue < minCostDelta:
                                 minCostDelta = costValue
@@ -643,9 +657,9 @@ def dispatch_nodePair(node_list: list[Node]  , id_to_vehicle: Dict[str , Vehicle
                                 isExhausive = True
                             del exhaustive_route_node_list[-7:]
                     elif empty_pos_num == 2:
-                        if modle8[i][0] == 0 and modle8[i][1] == 1:
+                        if config.modle8[i][0] == 0 and config.modle8[i][1] == 1:
                             for j in range(2, 8):
-                                exhaustive_route_node_list.append(modle_node_list[modle8[i][j] - 2])
+                                exhaustive_route_node_list.append(modle_node_list[config.modle8[i][j] - 2])
                             costValue = cost_of_a_route(exhaustive_route_node_list, vehicle , id_to_vehicle , route_map, vehicleid_to_plan, mode)
                             if costValue < minCostDelta:
                                 minCostDelta = costValue
@@ -654,9 +668,9 @@ def dispatch_nodePair(node_list: list[Node]  , id_to_vehicle: Dict[str , Vehicle
                                 isExhausive = True
                             del exhaustive_route_node_list[-6:]
                     elif empty_pos_num == 3:
-                        if modle8[i][0] == 0 and modle8[i][1] == 1 and modle8[i][2] == 2:
+                        if config.modle8[i][0] == 0 and config.modle8[i][1] == 1 and config.modle8[i][2] == 2:
                             for j in range(3, 8):
-                                exhaustive_route_node_list.append(modle_node_list[modle8[i][j] - 3])
+                                exhaustive_route_node_list.append(modle_node_list[config.modle8[i][j] - 3])
                             costValue = cost_of_a_route(exhaustive_route_node_list, vehicle , id_to_vehicle , route_map, vehicleid_to_plan, mode)
                             if costValue < minCostDelta:
                                 minCostDelta = costValue
@@ -666,7 +680,7 @@ def dispatch_nodePair(node_list: list[Node]  , id_to_vehicle: Dict[str , Vehicle
                             del exhaustive_route_node_list[-5:]
                     else:
                         for j in range(8):
-                            exhaustive_route_node_list.append(modle_node_list[modle8[i][j]])
+                            exhaustive_route_node_list.append(modle_node_list[config.modle8[i][j]])
                         costValue = cost_of_a_route(exhaustive_route_node_list, vehicle , id_to_vehicle , route_map, vehicleid_to_plan, mode)
                         if costValue < minCostDelta:
                             minCostDelta = costValue
@@ -742,6 +756,10 @@ def random_dispatch_nodePair(node_list: list[Node]  , id_to_vehicle: Dict[str , 
             random.shuffle(feasible_position1)
             for insert_posI in feasible_position1:
                 feasible_position2 = [i for i in range(insert_posI +1, len(vehicleid_to_plan[selected_vehicleID]) + 2)]
+                
+                # dao vi tri tren node giao
+                random.shuffle(feasible_position2)
+                
                 for insert_posJ in feasible_position2:
                     vehicleid_to_plan[selected_vehicleID].insert(insert_posI , pickup_node)
                     vehicleid_to_plan[selected_vehicleID].insert(insert_posJ , delivery_node)
@@ -1010,19 +1028,19 @@ def cost_of_a_route (temp_route_node_list : List[Node] , vehicle: Vehicle , id_t
                 distance = float(dis_and_time[0])
                 time = int(dis_and_time[1])
 
-                curr_time[minT2VehicleIndex] = tTrue + APPROACHING_DOCK_TIME + service_time + time
-                leave_last_node_time[minT2VehicleIndex] = tTrue + APPROACHING_DOCK_TIME + service_time
+                curr_time[minT2VehicleIndex] = tTrue + config.APPROACHING_DOCK_TIME + service_time + time
+                leave_last_node_time[minT2VehicleIndex] = tTrue + config.APPROACHING_DOCK_TIME + service_time
                 driving_dis += distance
 
-        tw = [minT, tTrue + APPROACHING_DOCK_TIME + service_time]
+        tw = [minT, tTrue + config.APPROACHING_DOCK_TIME + service_time]
         tw_list = dock_table.get(minTNode.id, [])
 
         tw_list.append(tw)
         dock_table[minTNode.id] = tw_list
     
-    objF = (Delta * overtime_Sum) + (driving_dis / float(len(id_to_vehicle)))
+    objF = (config.Delta * overtime_Sum) + (driving_dis / float(len(id_to_vehicle)))
     if mode == 'overtime':
-        return (Delta * overtime_Sum)
+        return (config.Delta * overtime_Sum)
     elif mode  == 'distance':
         return (driving_dis / float(len(id_to_vehicle)))
     if objF < 0:
@@ -1184,17 +1202,17 @@ def total_cost(id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tupl
                 distance = float(dis_and_time[0])
                 time = int(dis_and_time[1])
 
-                curr_time[minT2VehicleIndex] = tTrue + APPROACHING_DOCK_TIME + service_time + time
-                leave_last_node_time[minT2VehicleIndex] = tTrue + APPROACHING_DOCK_TIME + service_time
+                curr_time[minT2VehicleIndex] = tTrue + config.APPROACHING_DOCK_TIME + service_time + time
+                leave_last_node_time[minT2VehicleIndex] = tTrue + config.APPROACHING_DOCK_TIME + service_time
                 driving_dis += distance
 
-        tw = [minT, tTrue + APPROACHING_DOCK_TIME + service_time]
+        tw = [minT, tTrue + config.APPROACHING_DOCK_TIME + service_time]
         tw_list = dock_table.get(minTNode.id, [])
 
         tw_list.append(tw)
         dock_table[minTNode.id] = tw_list
     
-    objF = (Delta * overtime_Sum) + (driving_dis / float(len(id_to_vehicle)))
+    objF = (config.Delta * overtime_Sum) + (driving_dis / float(len(id_to_vehicle)))
     if objF < 0:
         print("the objective function less than 0" , file= sys.stderr)
     return objF
@@ -1408,7 +1426,7 @@ def single_vehicle_cost(route_node_list: List[Node] , vehicle:Vehicle , route_ma
                 distance , time = route_map.get((curr_factoryID , next_factoryID))
                 distance = float(distance)
                 time = int(time)
-                utilTime += APPROACHING_DOCK_TIME
+                utilTime += config.APPROACHING_DOCK_TIME
             driving_dis += distance
             utilTime += time
             
@@ -1443,7 +1461,7 @@ def single_vehicle_cost(route_node_list: List[Node] , vehicle:Vehicle , route_ma
                 distance , time = route_map.get((curr_factoryID , next_factoryID))
                 distance = float(distance)
                 time = int(time)
-                utilTime += APPROACHING_DOCK_TIME
+                utilTime += config.APPROACHING_DOCK_TIME
             driving_dis += distance
             utilTime += time
             
@@ -1458,7 +1476,7 @@ def single_vehicle_cost(route_node_list: List[Node] , vehicle:Vehicle , route_ma
             utilTime += next_node.service_time
             curr_factoryID = next_factoryID
     
-    objF = Delta1 * overtime_sum + driving_dis
+    objF = config.Delta1 * overtime_sum + driving_dis
     return objF
 
 def get_couple_end_idx_map(route_node_list: List[Node]):

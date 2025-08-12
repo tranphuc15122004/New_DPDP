@@ -12,6 +12,7 @@ from algorithm.Object import *
 from algorithm.engine import *
 import algorithm.algorithm_config as config
 from algorithm.local_search import *
+from algorithm.Test_algorithm.new_LS import *
 
 def new_dispatch_new_orders(vehicleid_to_plan: Dict[str , list[Node]] ,  id_to_factory:Dict[str , Factory] , route_map: Dict[tuple , tuple] ,  id_to_vehicle: Dict[str , Vehicle] , id_to_unlocated_items:Dict[str , OrderItem], new_order_itemIDs: list[str]):
     all_exhautive = True
@@ -220,6 +221,59 @@ def generate_random_chromosome(initial_vehicleid_to_plan : Dict[str , List[Node]
     population.append(Chromosome(initial_vehicleid_to_plan , route_map , id_to_vehicle))
     return population , pdg_Map 
 
+
+def new_generate_random_chromosome(initial_vehicleid_to_plan : Dict[str , List[Node]],  route_map: Dict[Tuple, Tuple], id_to_vehicle: Dict[str, Vehicle], Unongoing_super_nodes : Dict[int , Dict[str, Node]]  ,Base_vehicleid_to_plan : Dict[str , List[Node]] , quantity : int):
+    ls_node_pair_num = len(Unongoing_super_nodes)
+    if ls_node_pair_num == 0:
+        return None , None
+
+    #Quan the
+    population : List[Chromosome] = []
+    number_of_node = 0
+    for plan in initial_vehicleid_to_plan.values():
+        number_of_node += len(plan)
+    
+    pdg_Map : Dict[str , List[Node]] = {}
+    
+    # tao Dict cac super node
+    for idx, pdg in Unongoing_super_nodes.items():
+        pickup_node = None
+        delivery_node = None
+        node_list: List[Node] = []
+        pos_i = 0
+        pos_j = 0
+        d_num = len(pdg) // 2
+        index = 0
+
+        if pdg:
+            vehicleID = ''
+            for v_and_pos_str, node in (pdg.items()):
+                vehicleID = v_and_pos_str.split(",")[0]
+                if index % 2 == 0:
+                    pos_i = int(v_and_pos_str.split(",")[1])
+                    pickup_node = node
+                    node_list.insert(0, pickup_node)
+                    index += 1
+                else:
+                    pos_j = int(v_and_pos_str.split(",")[1])
+                    delivery_node = node
+                    node_list.append(delivery_node)
+                    index += 1
+                    pos_j = int(pos_j - d_num + 1)
+            
+            k : str = f"{vehicleID},{int(pos_i)}+{int(pos_j)}"
+            pdg_Map[k] = node_list
+    if len(pdg_Map) < 2:
+        return None , None
+    
+    while len(population) < quantity:
+        new_individual = disturbance_opt(initial_vehicleid_to_plan , id_to_vehicle , route_map , 0.3)
+        if new_individual:
+            population.append(new_individual)
+    
+    population.append(Chromosome(initial_vehicleid_to_plan , route_map , id_to_vehicle))
+    return population , pdg_Map 
+
 def calculate_diversity(population: List[Chromosome]) -> float:
     """Tính độ đa dạng của quần thể dựa trên sự khác biệt về route"""
     if len(population) < 2:
@@ -413,11 +467,11 @@ def randon_1_LS(indivisual: Chromosome , is_limited = False , mode = 0):
     for method_name in methods.keys():
         indivisual.improved_LS_map[method_name] += counters[method_name]
     total_ls_time = time.time() - begin_LS_time
-    print(f"LS: {method_name} | TotalTime:{total_ls_time:.3f}s | Cost:{total_cost(indivisual.id_to_vehicle, indivisual.route_map, indivisual.solution):.2f}", file=sys.stderr)
+    print(f"LS: {chosen_method} | Count: {i} | TotalTime:{total_ls_time:.3f}s | Cost:{total_cost(indivisual.id_to_vehicle, indivisual.route_map, indivisual.solution):.2f}", file=sys.stderr)
 
 
-def new_crossover(parent1: Chromosome , parent2: Chromosome , PDG_map : Dict[str , List[Node]]):
-    
+def new_crossover(parent1: Chromosome , parent2: Chromosome , PDG_map : Dict[str , List[Node]] , is_limited = False):
+    begin_func_time = time.time()
     # Cac super node
     new_PDG_map : Dict[str , List[Node]] = {}
     for key , value in PDG_map.items():
@@ -467,10 +521,10 @@ def new_crossover(parent1: Chromosome , parent2: Chromosome , PDG_map : Dict[str
                     if check_valid_1[key] > 1:
                         first_itemID_of_redundant_supernode = key.split('_')[-1]
                         redundant.append(first_itemID_of_redundant_supernode)
-                        print(f"Redundant nodes: {redundant}" , file= sys.stderr)
+                        #print(f"Redundant nodes: {redundant}" , file= sys.stderr)
                         # Xóa node giao của super node thừa
                         del_index.append(i)
-                        print('Đã xóa 1 super node thừa' , file= sys.stderr)
+                        #print('Đã xóa 1 super node thừa' , file= sys.stderr)
         for i in del_index:
             child_solution_1[vehicleID].pop(i)
         
@@ -496,11 +550,11 @@ def new_crossover(parent1: Chromosome , parent2: Chromosome , PDG_map : Dict[str
                     if check_valid_2[key] > 1:
                         first_itemID_of_redundant_supernode = key.split('_')[-1]
                         redundant.append(first_itemID_of_redundant_supernode)
-                        print(f"Redundant nodes: {redundant}" , file= sys.stderr)
+                        #print(f"Redundant nodes: {redundant}" , file= sys.stderr)
 
                         # Xóa node giao của super node thừa
                         del_index.append(i)
-                        print('Đã xóa 1 super node thừa' , file= sys.stderr)
+                        #print('Đã xóa 1 super node thừa' , file= sys.stderr)
         for i in del_index:
             child_solution_2[vehicleID].pop(i)
     
@@ -525,6 +579,8 @@ def new_crossover(parent1: Chromosome , parent2: Chromosome , PDG_map : Dict[str
     if child1_node_num != node_num or child2_node_num != node_num:
         return None , None
     
+    print('Thoi gian thuc hien crossover: ' , time.time() - begin_func_time  , file=sys.stderr)
+    
     #Tối ưu các lời giải relaxation con
     sorted_child_solution_1 = sorted(child_solution_1.items() ,  key=lambda x: int(x[0].split('_')[1]))
     child_solution_1.clear()
@@ -536,20 +592,21 @@ def new_crossover(parent1: Chromosome , parent2: Chromosome , PDG_map : Dict[str
     child_solution_2.update(sorted_child_solution_2)
     child_2 = Chromosome(child_solution_2 , parent2.route_map , parent2.id_to_vehicle)
     
-    randon_1_LS(child_1 , False , 1)
-    randon_1_LS(child_2 , False , 1)
+    randon_1_LS(child_1 , is_limited , 0)
+    randon_1_LS(child_2 , is_limited , 0)
     
     # Kiem tra lai và thêm các node còn thiếu solution 1        
     for key, value in check_valid_1.items():
         if value == 0:
-            if random.uniform(0 , 1) < 0.5:
+            if random.uniform(0 , 1) < 1:
                 # truong hop bi thieu 1 super node thi gan theo chien luoc CI vao solution hien tai
+                selected_vehicleID = random.choice(list(parent1.id_to_vehicle.keys()))
                 node_list = new_PDG_map[key]
                 isExhausive = False
                 route_node_list : List[Node] = []
                 
                 if node_list:
-                    isExhausive , bestInsertVehicleID, bestInsertPosI, bestInsertPosJ , bestNodeList = dispatch_nodePair(node_list , parent1.id_to_vehicle , child_solution_1 , parent1.route_map)
+                    isExhausive , bestInsertVehicleID, bestInsertPosI, bestInsertPosJ , bestNodeList = dispatch_nodePair(node_list , parent1.id_to_vehicle , child_solution_1 , parent1.route_map ,selected_vehicleID)
                     
                 route_node_list = child_solution_1.get(bestInsertVehicleID , [])
 
@@ -575,19 +632,21 @@ def new_crossover(parent1: Chromosome , parent2: Chromosome , PDG_map : Dict[str
                     # Random dispatch
                     random_dispatch_nodePair(node_list, parent1.id_to_vehicle, child_solution_1)
             
-            print('Cập nhật super node còn thiếu' , file= sys.stderr)
+            #print('Cập nhật super node còn thiếu' , file= sys.stderr)
             
     # Kiem tra lai và thêm các node còn thiếu solution 2      
     for key, value in check_valid_2.items():
         if value == 0:
             if random.uniform(0 , 1) < 0.5:
                 # truong hop bi thieu 1 super node thi gan theo chien luoc CI vao solution hien tai
+                selected_vehicleID = random.choice(list(parent1.id_to_vehicle.keys()))
+                
                 node_list = new_PDG_map[key]
                 isExhausive = False
                 route_node_list : List[Node] = []
                 
                 if node_list:
-                    isExhausive , bestInsertVehicleID, bestInsertPosI, bestInsertPosJ , bestNodeList = dispatch_nodePair(node_list , parent2.id_to_vehicle , child_solution_2 , parent2.route_map)
+                    isExhausive , bestInsertVehicleID, bestInsertPosI, bestInsertPosJ , bestNodeList = dispatch_nodePair(node_list , parent2.id_to_vehicle , child_solution_2 , parent2.route_map , selected_vehicleID)
                     
                 route_node_list = child_solution_2.get(bestInsertVehicleID , [])
 
@@ -612,8 +671,12 @@ def new_crossover(parent1: Chromosome , parent2: Chromosome , PDG_map : Dict[str
                 else:
                     # Random dispatch
                     random_dispatch_nodePair(node_list, parent2.id_to_vehicle, child_solution_2)
-            print('Cập nhật super node còn thiếu' , file= sys.stderr)
+            #print('Cập nhật super node còn thiếu' , file= sys.stderr)
     
     #child_1.fitness = child_1.evaluate_fitness()
     #child_2.fitness = child_2.evaluate_fitness()
+    print('Thoi gian thuc hien crossover: ' , time.time() - begin_func_time  , file=sys.stderr)
+    print(child_1.fitness , file=sys.stderr)
+    print(child_2.fitness , file=sys.stderr)
     return child_1 , child_2
+
