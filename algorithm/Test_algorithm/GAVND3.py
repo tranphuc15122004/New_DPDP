@@ -6,6 +6,8 @@ import time
 from algorithm.engine import *
 from algorithm.Test_algorithm.new_LS import *
 from algorithm.Test_algorithm.new_engine import *
+from algorithm.Test_algorithm.new_LS import *
+
 
 def GAVND_3(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tuple, Tuple], 
             id_to_vehicle: Dict[str, Vehicle], Unongoing_super_nodes: Dict[int, Dict[str, Node]], 
@@ -48,7 +50,7 @@ def GAVND_3(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
             while len(new_population) < config.POPULATION_SIZE:
                 parent1, parent2 = select_parents(population)
                 if parent1 and parent2:
-                    child1 , child2 = new_crossover(parent1 , parent2 , PDG_map , False)
+                    child1 , child2 = new_crossover(parent1 , parent2 , PDG_map , True)
                 else:
                     break
                 if child1: new_population.append(child1)
@@ -61,8 +63,8 @@ def GAVND_3(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
             if population[0].fitness < best_solution.fitness: config.IMPROVED_IN_CROSS += 1
             
             
-            for c in range(len(population) // 2):
-                randon_1_LS(population[c] , False , 0)
+            for c in range(len(population)):
+                randon_1_LS(population[c] , True , 0)
             population.sort(key=lambda x: x.fitness)
             if population[0].fitness < best_solution.fitness: config.IMPROVED_IN_MUTATION += 1
         
@@ -149,10 +151,10 @@ def adaptive_LS_stategy(indivisual: Chromosome, is_limited=True , mode = 1):
     
     # Dictionary các phương pháp Local Search
     methods = {
-        'PDPairExchange': lambda: inter_couple_exchange(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
-        'BlockExchange': lambda: block_exchange(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
-        'BlockRelocate': lambda: block_relocate(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
-        'mPDG': lambda: multi_pd_group_relocate(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
+        'PDPairExchange': lambda: new_inter_couple_exchange(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
+        'BlockExchange': lambda: new_block_exchange(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
+        'BlockRelocate': lambda: new_block_relocate(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
+        'mPDG': lambda: new_multi_pd_group_relocate(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
         '2opt': lambda: improve_ci_path_by_2_opt(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited)
     }
     
@@ -275,14 +277,14 @@ def maintain_diversity(population: List[Chromosome],
         if random.random() < 0.5:
             # Tạo hoàn toàn ngẫu nhiên
             #new_individual = generate_single_random_chromosome(Base_vehicleid_to_plan, route_map, id_to_vehicle, PDG_map)
-            new_individual = disturbance_opt(elite[0].solution , id_to_vehicle , route_map , 0.3)
+            new_individual = disturbance_opt(elite[0].solution , id_to_vehicle , route_map , 0.5)
             new_individuals.append(new_individual)
         else:
             # Random crossover từ elite
             if random.random() < 0.5 and len(unique_population) > 2:
                 while True:
                     parent1, parent2 = random.sample(unique_population, 2)
-                    child1 , child2 = new_crossover(parent1 , parent2 , PDG_map,  False)
+                    child1 , child2 = new_crossover(parent1 , parent2 , PDG_map,  True)
                     if child2 and child1:
                         break
                 new_individuals.append(child1)

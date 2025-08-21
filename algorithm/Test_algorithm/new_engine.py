@@ -267,7 +267,7 @@ def new_generate_random_chromosome(initial_vehicleid_to_plan : Dict[str , List[N
         return None , None
     
     while len(population) < quantity:
-        new_individual = disturbance_opt(initial_vehicleid_to_plan , id_to_vehicle , route_map , 0.3)
+        new_individual = disturbance_opt(initial_vehicleid_to_plan , id_to_vehicle , route_map , 0.5)
         if new_individual:
             population.append(new_individual)
     
@@ -436,10 +436,10 @@ def randon_1_LS(indivisual: Chromosome , is_limited = False , mode = 0):
     
     # Dictionary các phương pháp Local Search
     methods = {
-        'PDPairExchange': lambda: inter_couple_exchange(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
-        'BlockExchange': lambda: block_exchange(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
-        'BlockRelocate': lambda: block_relocate(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
-        'mPDG': lambda: multi_pd_group_relocate(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
+        'PDPairExchange': lambda: new_inter_couple_exchange(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
+        'BlockExchange': lambda: new_block_exchange(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
+        'BlockRelocate': lambda: new_block_relocate(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
+        'mPDG': lambda: new_multi_pd_group_relocate(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
         '2opt': lambda: improve_ci_path_by_2_opt(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited)
     }
     
@@ -606,10 +606,9 @@ def new_crossover(parent1: Chromosome , parent2: Chromosome , PDG_map : Dict[str
                 route_node_list : List[Node] = []
                 
                 if node_list:
-                    isExhausive , bestInsertVehicleID, bestInsertPosI, bestInsertPosJ , bestNodeList = dispatch_nodePair(node_list , parent1.id_to_vehicle , child_solution_1 , parent1.route_map ,selected_vehicleID)
+                    isExhausive , bestInsertVehicleID, bestInsertPosI, bestInsertPosJ , bestNodeList = new_dispatch_nodePair(node_list , parent1.id_to_vehicle , child_solution_1 , parent1.route_map ,selected_vehicleID)
                     
                 route_node_list = child_solution_1.get(bestInsertVehicleID , [])
-
                 if isExhausive:
                     route_node_list = bestNodeList[:]
                 else:
@@ -624,20 +623,13 @@ def new_crossover(parent1: Chromosome , parent2: Chromosome , PDG_map : Dict[str
                 child_solution_1[bestInsertVehicleID] = route_node_list
             else:
                 node_list = new_PDG_map[key]
-                if random.uniform(0 , 1) < 0.25:
-                    # Random vehicle
-                    selected_vehicleID = random.choice(list(parent1.id_to_vehicle.keys()))
-                    child_solution_1[selected_vehicleID].extend(node_list)
-                else:
-                    # Random dispatch
-                    random_dispatch_nodePair(node_list, parent1.id_to_vehicle, child_solution_1)
+                random_dispatch_nodePair(node_list, parent1.id_to_vehicle, child_solution_1)
             
-            #print('Cập nhật super node còn thiếu' , file= sys.stderr)
             
     # Kiem tra lai và thêm các node còn thiếu solution 2      
     for key, value in check_valid_2.items():
         if value == 0:
-            if random.uniform(0 , 1) < 0.5:
+            if random.uniform(0 , 1) < 1:
                 # truong hop bi thieu 1 super node thi gan theo chien luoc CI vao solution hien tai
                 selected_vehicleID = random.choice(list(parent1.id_to_vehicle.keys()))
                 
@@ -646,7 +638,7 @@ def new_crossover(parent1: Chromosome , parent2: Chromosome , PDG_map : Dict[str
                 route_node_list : List[Node] = []
                 
                 if node_list:
-                    isExhausive , bestInsertVehicleID, bestInsertPosI, bestInsertPosJ , bestNodeList = dispatch_nodePair(node_list , parent2.id_to_vehicle , child_solution_2 , parent2.route_map , selected_vehicleID)
+                    isExhausive , bestInsertVehicleID, bestInsertPosI, bestInsertPosJ , bestNodeList = new_dispatch_nodePair(node_list , parent2.id_to_vehicle , child_solution_2 , parent2.route_map , selected_vehicleID )
                     
                 route_node_list = child_solution_2.get(bestInsertVehicleID , [])
 
@@ -664,19 +656,91 @@ def new_crossover(parent1: Chromosome , parent2: Chromosome , PDG_map : Dict[str
                 child_solution_2[bestInsertVehicleID] = route_node_list
             else:
                 node_list = new_PDG_map[key]
-                if random.uniform(0 , 1) < 0.25:
-                    # Random vehicle
-                    selected_vehicleID = random.choice(list(parent2.id_to_vehicle.keys()))
-                    child_solution_2[selected_vehicleID].extend(node_list)
-                else:
-                    # Random dispatch
-                    random_dispatch_nodePair(node_list, parent2.id_to_vehicle, child_solution_2)
-            #print('Cập nhật super node còn thiếu' , file= sys.stderr)
+                random_dispatch_nodePair(node_list, parent2.id_to_vehicle, child_solution_2)
     
-    #child_1.fitness = child_1.evaluate_fitness()
-    #child_2.fitness = child_2.evaluate_fitness()
     print('Thoi gian thuc hien crossover: ' , time.time() - begin_func_time  , file=sys.stderr)
     print(child_1.fitness , file=sys.stderr)
     print(child_2.fitness , file=sys.stderr)
     return child_1 , child_2
 
+def new_dispatch_nodePair(node_list: list[Node]  , id_to_vehicle: Dict[str , Vehicle] , vehicleid_to_plan: Dict[str, list[Node]], route_map: Dict[tuple , tuple]  , selected_vehicle: str= None , mode = 'total' ):
+    bestInsertVehicleID: str = ''
+    bestInsertPosI: int = 0
+    bestInsertPosJ: int = 1
+    bestNodeList : list[Node] = []
+    isExhausive  = False
+    new_pickup_node = node_list[0]
+    new_delivery_node = node_list[1]
+    minCostDelta = math.inf
+
+    for vehicleID , vehicle in id_to_vehicle.items():
+        if selected_vehicle is not None and vehicleID != selected_vehicle:
+            continue
+        
+        vehicle_plan = vehicleid_to_plan[vehicleID]
+        
+        node_list_size = len(vehicle_plan) if vehicle_plan else 0
+
+        insert_pos = 0 
+        model_nodes_num = node_list_size + 2
+        first_merge_node_num = 0
+
+        if vehicle.des:
+            if new_pickup_node.id != vehicle.des.id:
+                insert_pos = 1
+            
+            if vehicle_plan is not None and vehicle_plan:
+                for node in vehicle_plan:
+                    if vehicle.des.id != node.id:
+                        break
+                    first_merge_node_num += 1
+
+        model_nodes_num -= first_merge_node_num
+        cp_route_node_list : List[Node] = [] # Một copy của một kế hoạch hiện có 
+        if vehicle_plan:
+            for node in vehicle_plan:
+                cp_route_node_list.append(node)
+        
+        
+        for i in range(insert_pos, node_list_size + 1):
+            if vehicle_plan is not None:
+                tempRouteNodeList = copy.deepcopy(vehicle_plan)
+            else:
+                tempRouteNodeList = []
+
+            tempRouteNodeList.insert(i, new_pickup_node)
+
+            for j in range(i + 1, node_list_size + 2):
+                if j != i + 1 and tempRouteNodeList[j - 1].pickup_item_list:
+                    for k in range(j, node_list_size + 2):
+                        if tempRouteNodeList[k].delivery_item_list:
+                            if tempRouteNodeList[j - 1].pickup_item_list[0].id == tempRouteNodeList[k].delivery_item_list[- 1].id:
+                                j = k + 1
+                                break
+
+                elif tempRouteNodeList[j - 1].delivery_item_list :
+                    is_terminal = True
+                    for k in range(j - 2, -1, -1):
+                        if tempRouteNodeList[k].pickup_item_list:
+                            if tempRouteNodeList[j - 1].delivery_item_list[- 1].id == tempRouteNodeList[k].pickup_item_list[0].id:
+                                if k < i:
+                                    is_terminal = True
+                                    break
+                                elif k > i:
+                                    is_terminal = False
+                                    break
+                    if is_terminal:
+                        break
+
+                tempRouteNodeList.insert(j, new_delivery_node)
+
+                costValue = cost_of_a_route(tempRouteNodeList, vehicle, id_to_vehicle , route_map , vehicleid_to_plan, mode)
+                if costValue < minCostDelta:
+                    minCostDelta = costValue
+                    bestInsertPosI = i
+                    bestInsertPosJ = j
+                    bestInsertVehicleID = vehicleID
+                    isExhausive = False
+
+                tempRouteNodeList.pop(j)
+    return isExhausive , bestInsertVehicleID, bestInsertPosI, bestInsertPosJ , bestNodeList

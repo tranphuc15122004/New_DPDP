@@ -13,7 +13,6 @@ class Chromosome:
         self.solution = vehicleid_to_plan
         self.route_map = route_map
         self.id_to_vehicle = id_to_vehicle
-        #self.fitness = self.evaluate_fitness()
         self.improved_LS_map = {method: 0 for method in config.LS_METHODS}
 
 
@@ -22,11 +21,6 @@ class Chromosome:
         """Tự động tính toán fitness mỗi khi truy cập"""
         return total_cost(self.id_to_vehicle, self.route_map, self.solution)
 
-    
-    """ def evaluate_fitness(self) -> float:
-        self.fitness = total_cost(self.id_to_vehicle , self.route_map , self.solution)
-        return self.fitness
- """
     def mutate(self  ,is_limited = False , is_1LS : bool = False):
         mutate_solution(self , is_limited  , is_1LS)
         #self.fitness = self.evaluate_fitness()
