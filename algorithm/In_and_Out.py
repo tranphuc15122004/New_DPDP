@@ -181,7 +181,7 @@ def write_destination_json_to_file(vehicleid_to_destination : Dict[str , Node] ,
             }
         result_json[vehicleID] = current_node
     
-      # Đảm bảo input_directory hợp lệ
+    # Đảm bảo input_directory hợp lệ
     if not os.path.isdir(input_directory):
         try:
             os.makedirs(input_directory, exist_ok=True)
@@ -197,8 +197,7 @@ def write_destination_json_to_file(vehicleid_to_destination : Dict[str , Node] ,
             json.dump(result_json, file, ensure_ascii=False, indent=4)
     except IOError as e:
         print(f"Lỗi khi ghi file JSON: {e}", file = sys.stderr)
-        
-        
+
 
 def write_route_json_to_file(vehicleid_to_plan: Dict[str, list[Node]] , input_directory: str):
     result_json = {}

@@ -1,2 +1,3 @@
-naie
 numpy
+simpy
+pandas

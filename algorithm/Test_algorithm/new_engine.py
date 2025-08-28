@@ -305,8 +305,12 @@ def calculate_chromosome_distance(c1: Chromosome, c2: Chromosome) -> float:
         
         # Đếm số vị trí khác nhau
         for i in range(max_len):
-            node1_id = route1[i].id if i < len(route1) else None
-            node2_id = route2[i].id if i < len(route2) else None
+            node1_id = None
+            if i < len(route1):
+                node1_id = route1[i].pickup_item_list[0].id if route1[i].pickup_item_list else route1[i].delivery_item_list[0].id
+            node2_id =  None
+            if i < len(route2):
+                node2_id = route2[i].pickup_item_list[0].id if route2[i].pickup_item_list else route2[i].delivery_item_list[0].id
             
             if node1_id != node2_id:
                 distance += 1
