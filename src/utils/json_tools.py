@@ -57,7 +57,11 @@ def get_algorithm_calling_command():
             end_name = file.split('.')[-1]
             algorithm_language = Configs.ALGORITHM_LANGUAGE_MAP.get(end_name)
             if algorithm_language == 'python':
-                return 'python {}'.format(file)
+                system = platform.system()
+                if system == 'Windows':
+                    return 'python {}'.format(file)
+                elif system == 'Linux':
+                    return 'python3 {}'.format(file)
             elif algorithm_language == 'java':
                 return 'java {}'.format(file.split('.')[0])
             # c和c++调用方式一样，但系统不同调用方式有异
