@@ -51,15 +51,12 @@ def GAVND_4(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
             if random.uniform(0 , 1) < config.MUTATION_RATE:
                 adaptive_LS_stategy(population[c] , True) """
         
-        for c in range(int(len(population) * config.MUTATION_RATE)):
+        population.sort(key=lambda x: x.fitness)
+        for c in range( int(len(population) * config.MUTATION_RATE) ):
             adaptive_LS_stategy(population[c] , True)
         
         population.sort(key=lambda x: x.fitness)
         if population[0].fitness < best_solution.fitness: config.IMPROVED_IN_MUTATION += 1
-    
-        # Sắp xếp lại quần thể.
-        population.sort(key=lambda x: x.fitness)
-        population = population[:config.POPULATION_SIZE]
         
         
         # Cập nhật best solution
