@@ -51,7 +51,7 @@ def GAVND_4(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
             if random.uniform(0 , 1) < config.MUTATION_RATE:
                 adaptive_LS_stategy(population[c] , True) """
         
-        for c in range(len(population) * config.MUTATION_RATE):
+        for c in range(int(len(population) * config.MUTATION_RATE)):
             adaptive_LS_stategy(population[c] , True)
         
         population.sort(key=lambda x: x.fitness)
