@@ -27,13 +27,15 @@ def get_remaining_time() -> float:
 
 
 """GA configuration"""
-POPULATION_SIZE = 15
+POPULATION_SIZE = 10
 NUMBER_OF_GENERATION = 20
 MUTATION_RATE = 1
-LS_MAX = 20
+LS_MAX = 10
 IMPROVED_IN_CROSS = 0
 IMPROVED_IN_MUTATION = 0
 IMPROVED_IN_DIVER = 0
+"""Per local search time limit (seconds). Each LS operator should stop when exceeding this budget."""
+LS_MAX_TIME_PER_OP = 6  # seconds (adjustable)
 
 """ ACO configuration """
 POPULATION_SIZE_ACO = 20

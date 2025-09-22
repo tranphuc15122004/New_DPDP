@@ -391,10 +391,10 @@ def calculate_delaytime_each_vehicle(chromosome: Chromosome) -> Dict[str , int]:
             if dis_and_time:
                 time = int(dis_and_time[1])
 
-                curr_time[minT2VehicleIndex] = tTrue + APPROACHING_DOCK_TIME + service_time + time
-                leave_last_node_time[minT2VehicleIndex] = tTrue + APPROACHING_DOCK_TIME + service_time
+                curr_time[minT2VehicleIndex] = tTrue + config.APPROACHING_DOCK_TIME + service_time + time
+                leave_last_node_time[minT2VehicleIndex] = tTrue + config.APPROACHING_DOCK_TIME + service_time
 
-        tw = [minT, tTrue + APPROACHING_DOCK_TIME + service_time]
+        tw = [minT, tTrue + config.APPROACHING_DOCK_TIME + service_time]
         tw_list = dock_table.get(minTNode.id, [])
 
         tw_list.append(tw)

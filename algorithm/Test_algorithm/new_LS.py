@@ -294,14 +294,14 @@ def disturbance_opt(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Di
     return Chromosome(new_vehicle_to_plan , route_map , id_to_vehicle)
 
 def new_inter_couple_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple] , is_limited : bool = False ):    
-    # Kiểm tra timeout ngay từ đầu
+    # Kiểm tra timeout toàn cục và khởi tạo thời gian bắt đầu cho giới hạn cục bộ
     if config.is_timeout():
         return False
+    op_start_time = time.time()
     
     is_improved = False
 
     dis_order_super_node , _ = get_UnongoingSuperNode(vehicleid_to_plan , id_to_vehicle)
-    vehicleid_to_delay = delaytime_for_each_node(id_to_vehicle , route_map , vehicleid_to_plan)
     
     ls_node_pair_num = len(dis_order_super_node)
     
@@ -309,7 +309,6 @@ def new_inter_couple_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_v
         return False
     vehicleID = ""
     pdg_Map : Dict[str , List[Node]] = {}
-    delay_map : Dict[str , float] = {}
     
     for idx, pdg in dis_order_super_node.items():
         pickup_node = None
@@ -337,14 +336,10 @@ def new_inter_couple_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_v
 
             k : str = f"{vehicleID},{int(pos_i)}+{int(pos_j)}"
             pdg_Map[k] = node_list
-            delay_map[k] = vehicleid_to_delay[vehicleID][pos_i] + vehicleid_to_delay[vehicleID][pos_j]
     
     if len(pdg_Map) < 2:
         return False
     
-    sorted_pdg_items = sorted(pdg_Map.items(), key=lambda item: delay_map[item[0]] ,reverse= True)
-    sorted_pdg_Map = {item[0]: item[1] for item in sorted_pdg_items}
-
     cost0 = total_cost(id_to_vehicle , route_map, vehicleid_to_plan)
     min_cost = cost0
 
@@ -357,7 +352,7 @@ def new_inter_couple_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_v
     idx_j = 0
     for before_key , before_DPG in pdg_Map.items():
         # Kiểm tra timeout trong vòng lặp ngoài
-        if config.is_timeout():
+        if config.is_timeout() or (time.time() - op_start_time) > config.LS_MAX_TIME_PER_OP:
             break
             
         before_vehicle = id_to_vehicle.get(before_key.split(",")[0])
@@ -368,7 +363,7 @@ def new_inter_couple_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_v
         idx_j = 0
         for next_key , next_DPG in pdg_Map.items():
             # Kiểm tra timeout trong vòng lặp trong (mỗi 10 iterations để tránh overhead)
-            if idx_j % 10 == 0 and config.is_timeout():
+            if idx_j % 10 == 0 and (config.is_timeout() or (time.time() - op_start_time) > config.LS_MAX_TIME_PER_OP):
                 break
             
             if idx_i >= idx_j:
@@ -442,7 +437,7 @@ def new_inter_couple_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_v
                 break
         
         # Kiểm tra timeout và early exit
-        if config.is_timeout() or (is_improved and is_limited):
+        if config.is_timeout() or (is_improved and is_limited) or (time.time() - op_start_time) > config.LS_MAX_TIME_PER_OP:
             break    
         
         idx_i += 1
@@ -493,6 +488,7 @@ def new_inter_couple_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_v
 def new_block_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple] , is_limited : bool = False):
     if config.is_timeout():
         return False
+    op_start_time = time.time()
     
     is_improved = False
     dis_order_super_node , _ = get_UnongoingSuperNode(vehicleid_to_plan , id_to_vehicle)
@@ -534,7 +530,7 @@ def new_block_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle:
             block_map[k] = node_list
     if len(block_map)  <2:
         return False
-        
+    
     origin_cost = total_cost(id_to_vehicle , route_map , vehicleid_to_plan)
     
     min_cost = origin_cost
@@ -547,9 +543,9 @@ def new_block_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle:
     
     for before_key , before_block in block_map.items():
         # Kiểm tra timeout trong vòng lặp ngoài
-        if config.is_timeout():
+        if config.is_timeout() or (time.time() - op_start_time) > config.LS_MAX_TIME_PER_OP:
             break
-            
+        
         before_vehicle = id_to_vehicle.get(before_key.split(",")[0])
         before_posI = int(before_key.split(",")[1].split("+")[0])
         before_posJ = int(before_key.split(",")[1].split("+")[1])
@@ -558,9 +554,9 @@ def new_block_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle:
         idxJ = 0
         for next_key , next_block in block_map.items():
             # Kiểm tra timeout trong vòng lặp trong (mỗi 10 iterations)
-            if idxJ % 10 == 0 and config.is_timeout():
+            if idxJ % 10 == 0 and ((config.is_timeout() or (time.time() - op_start_time) > config.LS_MAX_TIME_PER_OP)):
                 break
-                
+            
             if idxI >= idxJ: 
                 idxJ +=1
                 continue
@@ -579,6 +575,7 @@ def new_block_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle:
                 
                 del route_node_list1[before_posI : before_posI + block1_len]
                 del route_node_list2[next_posI : next_posI + block2_len]
+                
                 route_node_list1[before_posI: before_posI] = temp2
                 route_node_list2[next_posI: next_posI] = temp1
 
@@ -596,6 +593,7 @@ def new_block_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle:
                     
                     if cost1 < min_cost:
                         is_improved = True
+                        min_cost = cost1
                         min_cost_block1_key_str = before_key
                         min_cost_block2_key_str = next_key
                         min_cost_block1  = before_block[:]
@@ -607,7 +605,7 @@ def new_block_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle:
                 route_node_list2 [next_posI: next_posI] = temp2
             else:
                 if before_posJ < next_posI or next_posJ < before_posI:
-                    if before_posJ < before_posI:
+                    if next_posJ < before_posI:
                         before_posI, next_posI = next_posI, before_posI
                         before_posJ, next_posJ = next_posJ, before_posJ
                         block1_len, block2_len = block2_len, block1_len
@@ -630,6 +628,7 @@ def new_block_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle:
                         cost1 = math.inf
                     if cost1 < min_cost:
                         is_improved = True
+                        min_cost = cost1
                         min_cost_block1_key_str = before_key
                         min_cost_block2_key_str = next_key
                         min_cost_block1 = before_block[:]
@@ -644,7 +643,7 @@ def new_block_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle:
                 break
             idxJ +=1
         # Kiểm tra timeout và early exit
-        if config.is_timeout() or (is_improved and is_limited):
+        if config.is_timeout() or (is_improved and is_limited) or (time.time() - op_start_time) > config.LS_MAX_TIME_PER_OP:
             break
         idxI +=1
     
@@ -693,10 +692,10 @@ def new_block_exchange(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle:
 def new_block_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple] , is_limited: bool = False ):
     if config.is_timeout():
         return False
+    op_start_time = time.time()
     
     is_improved = False
     dis_order_super_node ,_ = get_UnongoingSuperNode(vehicleid_to_plan , id_to_vehicle)
-    vehicleid_to_delay = delaytime_for_each_node(id_to_vehicle , route_map , vehicleid_to_plan)
     
     ls_node_pair_num = len(dis_order_super_node)
     if ls_node_pair_num == 0:
@@ -704,7 +703,6 @@ def new_block_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle:
     
     vehicleID = None
     block_map : Dict[str , List[Node]] = {}
-    delay_block_map : Dict[str , float] = {}
     
     for idx , pdg in dis_order_super_node.items():
         pickup_node : Node = None
@@ -729,21 +727,15 @@ def new_block_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle:
                     posJ = posJ - dNum + 1
                     
             vehicle_node_route : List[Node] = vehicleid_to_plan.get(vehicleID , [])
-            vehicle_delay_route : List[float] = vehicleid_to_delay.get(vehicleID , [])
-            block_delaytime = 0
             
             for i in range(posI + dNum , posJ):
                 node_list.insert(i - posI , vehicle_node_route[i])
-                block_delaytime += vehicle_delay_route[i]
             k : str = f"{vehicleID},{posI}+{posJ + dNum - 1}"    
             block_map[k] = node_list
-            delay_block_map[k] = block_delaytime
     
     if len(block_map)  <2:
         return False
     
-    sorted_pdg_items = sorted(block_map.items(), key=lambda item: delay_block_map[item[0]] ,reverse= True)
-    sorted_block_map = {item[0]: item[1] for item in sorted_pdg_items}
     
     origin_cost = total_cost(id_to_vehicle , route_map , vehicleid_to_plan)
 
@@ -754,7 +746,7 @@ def new_block_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle:
     best_relocate_block : List[Node] = None
     for before_key , before_block in block_map.items():
         # Kiểm tra timeout trong vòng lặp ngoài
-        if config.is_timeout():
+        if config.is_timeout() or (time.time() - op_start_time) > config.LS_MAX_TIME_PER_OP:
             break
             
         before_vid, before_pos = before_key.split(",")
@@ -767,7 +759,7 @@ def new_block_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle:
         
         for index, (vehicle_id, vehicle) in enumerate(id_to_vehicle.items(), start=1):
             # Kiểm tra timeout trong vòng lặp trong (mỗi 5 iterations)
-            if index % 5 == 0 and config.is_timeout():
+            if index % 5 == 0 and (config.is_timeout() or (time.time() - op_start_time) > config.LS_MAX_TIME_PER_OP):
                 break
             
             vehicle_id = f"V_{index}"
@@ -792,7 +784,7 @@ def new_block_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle:
                     break
         
         route_node_list1[before_post_i:before_post_i] = before_block  # Khôi phục dữ liệu ban đầu
-        if config.is_timeout() or (is_improved and is_limited): 
+        if config.is_timeout() or (is_improved and is_limited) or (time.time() - op_start_time) > config.LS_MAX_TIME_PER_OP: 
             break
 
     if is_improved:
@@ -813,6 +805,7 @@ def new_block_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle:
 def new_multi_pd_group_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple] , is_limited : bool = False):
     if config.is_timeout():
         return False
+    op_start_time = time.time()
     
     is_improved = False
     cp_vehicle_id2_planned_route : Dict [str , List [Node]]= {}
@@ -831,7 +824,7 @@ def new_multi_pd_group_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to
     
     for idx, pdg in dis_order_super_node.items():
         # Kiểm tra timeout trong quá trình xây dựng solution
-        if config.is_timeout():
+        if config.is_timeout() or (time.time() - op_start_time) > config.LS_MAX_TIME_PER_OP:
             break
             
         if not pdg or len(pdg) == 0:
@@ -897,7 +890,7 @@ def new_multi_pd_group_relocate(vehicleid_to_plan: Dict[str , List[Node]], id_to
     is_improved = False
     for i in range(ls_node_pair_num):
         # Kiểm tra timeout trong vòng lặp optimization
-        if config.is_timeout():
+        if config.is_timeout() or (time.time() - op_start_time) > config.LS_MAX_TIME_PER_OP:
             break
             
         if new_cost_delta[i] != math.inf:

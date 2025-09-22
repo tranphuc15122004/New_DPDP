@@ -9,7 +9,7 @@ from algorithm.Test_algorithm.new_engine import *
 from algorithm.Test_algorithm.new_LS import *
 
 
-def GAVND_3(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tuple, Tuple], 
+def GAVND_4(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tuple, Tuple], 
             id_to_vehicle: Dict[str, Vehicle], Unongoing_super_nodes: Dict[int, Dict[str, Node]], 
             Base_vehicleid_to_plan: Dict[str, List[Node]]) -> Chromosome:
     
@@ -22,9 +22,7 @@ def GAVND_3(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
     stagnant_generations = 0
     population.sort(key=lambda x: x.fitness)
     best_solution = population[0]
-    min_diversity = 0.15
     # Elite size
-    elite_size = max(2, config.POPULATION_SIZE // 5)
     
     for gen in range(config.NUMBER_OF_GENERATION):
         # Kiểm tra timeout
@@ -34,41 +32,27 @@ def GAVND_3(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
             print(f"TimeOut!! Elapsed: {elapsed_time:.1f}s")
             break
         
-        diversity = calculate_diversity(population)
-        if diversity < min_diversity:
-            population = maintain_diversity(population, id_to_vehicle, route_map, Base_vehicleid_to_plan, PDG_map )
-            population.sort(key=lambda x: x.fitness)
-            if population[0].fitness < best_solution.fitness: config.IMPROVED_IN_DIVER += 1
-        else:
-            new_population : List[Chromosome] = []
-            new_population.extend(population)
-
-            # Tạo con
-            while len(new_population) < 2 * config.POPULATION_SIZE:
-                parent1, parent2 = select_parents(population)
-                if parent1 and parent2:
-                    child1 , child2 = new_crossover(parent1 , parent2 , PDG_map , True)
-                else:
-                    break
-                
-                if child1: new_population.append(child1)
-                else: new_population.append(parent1)
-                if child2: new_population.append(child2)
-                else: new_population.append(parent2)
-                
-            if config.is_timeout():
-                break
+        # Tạo con
+        while len(population) < 2 * config.POPULATION_SIZE:
+            parent1, parent2 = select_parents(population)
+            if parent1 and parent2:
+                child = new_crossver2(parent1 , parent2 , Base_vehicleid_to_plan , PDG_map)
+            population.append(child)
             
-            new_population.sort(key=lambda x: x.fitness)
-            population = new_population[:POPULATION_SIZE]
-            
-            if population[0].fitness < best_solution.fitness: config.IMPROVED_IN_CROSS += 1
-            
-            for c in range(len(population)):
-                randon_1_LS(population[c] , False , 0)
-            population.sort(key=lambda x: x.fitness)
-            if population[0].fitness < best_solution.fitness: config.IMPROVED_IN_MUTATION += 1
+        if config.is_timeout():
+            break
         
+        population.sort(key=lambda x: x.fitness)
+        population = population[:config.POPULATION_SIZE]
+                
+        if population[0].fitness < best_solution.fitness: config.IMPROVED_IN_CROSS += 1
+        
+        for c in range(len(population)):
+            adaptive_LS_stategy(population[c] , True)
+        
+        population.sort(key=lambda x: x.fitness)
+        if population[0].fitness < best_solution.fitness: config.IMPROVED_IN_MUTATION += 1
+    
         # Sắp xếp lại quần thể.
         population.sort(key=lambda x: x.fitness)
         population = population[:config.POPULATION_SIZE]
@@ -81,22 +65,20 @@ def GAVND_3(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
         else:
             stagnant_generations += 1
         
-        diversity = calculate_diversity(population)
         
         print(f'Generation {gen+1}: Best = {best_solution.fitness:.2f}, '
             f'Worst = {population[-1].fitness:.2f}, '
             f'Avg = {sum([c.fitness for c in population]) / len(population):.2f}, '
-            f'Diversity = {diversity:.3f}, '
             f'Time: {time.time() - begin_gen_time}')
 
         # Điều kiện dừng
-        if stagnant_generations >= 7:
+        if stagnant_generations >= 5:
             print("Stopping early due to lack of improvement.")
             break
 
         # Time check - Điều chỉnh
         gen_end_time = time.time()
-                
+        
         # Tính tổng thời gian đã sử dụng
         elapsed_time = gen_end_time - config.BEGIN_TIME
         
@@ -169,27 +151,57 @@ def adaptive_LS_stategy(indivisual: Chromosome, is_limited=True , mode = 1):
         'BlockExchange': 0.0,
         'BlockRelocate': 0.0,
         'mPDG': 0.0,
-        '2opt': 0.0
     }
     
     while i < config.LS_MAX:
         if config.is_timeout():
             break
-    
-        #  Time each local search method execution (dùng for thay vì lặp lại code)
-        for idx in range(4):
-            ls_start = time.time()
-            if methods[method_names[idx]]():
-                ls_timings[method_names[idx]] += time.time() - ls_start
-                i += 1
-                counters[method_names[idx]] += 1
-                break  # Nếu cải thiện thì dừng vòng for, sang lần lặp tiếp theo của while
-            ls_timings[method_names[idx]] += time.time() - ls_start
-            if config.is_timeout():
-                break
-        else:
-            # Nếu không có phương pháp nào cải thiện, thoát khỏi while
+        
+        ls_start = time.time()
+        if methods[method_names[0]]():
+            ls_timings[method_names[0]] += time.time() - ls_start
+            i += 1
+            counters[method_names[0]] += 1
+            continue
+        ls_timings[method_names[0]] += time.time() - ls_start
+        
+        if config.is_timeout():
             break
+        
+        ls_start = time.time()
+        if methods[method_names[1]]():
+            ls_timings[method_names[1]] += time.time() - ls_start
+            i += 1
+            counters[method_names[1]] += 1
+            continue
+        ls_timings[method_names[1]] += time.time() - ls_start
+        
+        if config.is_timeout():
+            break
+        
+        ls_start = time.time()
+        if methods[method_names[2]]():
+            ls_timings[method_names[2]] += time.time() - ls_start
+            i += 1
+            counters[method_names[2]] += 1
+            continue
+        ls_timings[method_names[2]] += time.time() - ls_start
+        
+        if config.is_timeout():
+            break
+        
+        ls_start = time.time()
+        if methods[method_names[3]]():
+            ls_timings[method_names[3]] += time.time() - ls_start
+            i += 1
+            counters[method_names[3]] += 1
+            continue
+        ls_timings[method_names[3]] += time.time() - ls_start
+        
+        if config.is_timeout():
+            break
+        
+        break
 
     for method_name in methods.keys():
         indivisual.improved_LS_map[method_name] += counters[method_name]
@@ -198,65 +210,3 @@ def adaptive_LS_stategy(indivisual: Chromosome, is_limited=True , mode = 1):
     total_ls_time = sum(ls_timings.values())
     timing_details = " | ".join([f"{name}:{counters[name]}({ls_timings[name]:.3f}s)" for name in method_names])
     print(f"LS: {timing_details} | TotalTime:{total_ls_time:.3f}s | Cost:{total_cost(indivisual.id_to_vehicle, indivisual.route_map, indivisual.solution):.2f}", file=sys.stderr)
-
-def maintain_diversity(population: List[Chromosome], 
-                    id_to_vehicle: Dict[str, Vehicle],
-                    route_map: Dict[Tuple, Tuple],
-                    Base_vehicleid_to_plan: Dict[str, List[Node]],
-                    PDG_map: Dict[str, List[Node]]) -> List[Chromosome]:
-    """Duy trì độ đa dạng của quần thể"""
-    if config.is_timeout():
-        print("Timeout detected in maintain_diversity", file=sys.stderr)
-        return population  #  Return population hiện tại
-
-    print("Low diversity detected, applying diversity maintenance...")
-    
-    # Sắp xếp theo fitness
-    population.sort(key=lambda x: x.fitness)
-    
-    # Giữ lại elite 
-    elite_size = max(2, len(population) // 2)
-    elite = population[:elite_size]
-    
-    # Loại bỏ các cá thể quá giống nhau
-    unique_population = remove_similar_individuals(elite, threshold=0.0)
-    
-    # Tạo cá thể mới để bù đắp
-    new_individuals = []
-    needed = config.POPULATION_SIZE - len(unique_population)
-    
-    for i in range(needed):
-        if config.is_timeout():
-            print(f"Timeout during creating new individuals, created {i}/{needed}", file=sys.stderr)
-            break
-        
-        # Tạo cá thể mới bằng nhiều phương pháp khác nhau
-        new_individual = None
-        if random.random() < 5:
-            # Tạo hoàn toàn ngẫu nhiên
-            #new_individual = generate_single_random_chromosome(Base_vehicleid_to_plan, route_map, id_to_vehicle, PDG_map)
-            new_individual = disturbance_opt(elite[0].solution , id_to_vehicle , route_map , 0.4)
-            new_individuals.append(new_individual)
-        else:
-            # Random crossover từ elite
-            if random.random() < 0.5 and len(unique_population) > 2:
-                while True:
-                    parent1, parent2 = random.sample(unique_population, 2)
-                    child1 , child2 = new_crossover(parent1 , parent2 , PDG_map,  True)
-                    if child2 and child1:
-                        break
-                new_individuals.append(child1)
-                new_individuals.append(child2)
-
-            else:
-                parent1 = random.sample(population , 1)[0]
-                new_individual = copy.deepcopy(parent1)
-                new_individuals.append(new_individual)
-
-    res_population = unique_population + new_individuals
-    res_population.sort(key=lambda x: x.fitness)
-    
-    for i in range (len(res_population) // 4):
-        adaptive_LS_stategy(res_population[i] , True , 1)
-    
-    return res_population

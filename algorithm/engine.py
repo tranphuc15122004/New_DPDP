@@ -9,9 +9,10 @@ import sys
 from typing import Dict , List, Optional, Tuple
 from algorithm.Object import *
 import algorithm.algorithm_config as config
+from src.conf.configs import Configs
 
 
-input_directory = r'algorithm\data_interaction'
+input_directory = Configs.algorithm_data_interaction_folder_path   
 
 def restore_scene_with_single_node(vehicleid_to_plan: Dict[str , List[Node]], id_to_ongoing_items: Dict[str , OrderItem], id_to_unlocated_items: Dict[str , OrderItem], id_to_vehicle: Dict[str , Vehicle] , id_to_factory: Dict[str , Factory], id_to_allorder: Dict[str , OrderItem]) -> List[str]:
     onVehicleOrderItems = ''

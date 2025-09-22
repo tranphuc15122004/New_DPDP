@@ -443,8 +443,7 @@ def randon_1_LS(indivisual: Chromosome , is_limited = False , mode = 0):
         'PDPairExchange': lambda: new_inter_couple_exchange(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
         'BlockExchange': lambda: new_block_exchange(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
         'BlockRelocate': lambda: new_block_relocate(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
-        'mPDG': lambda: new_multi_pd_group_relocate(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
-        '2opt': lambda: improve_ci_path_by_2_opt(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited)
+        'mPDG': lambda: new_multi_pd_group_relocate(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited)
     }
     
     # Counter cho từng phương pháp
@@ -452,7 +451,7 @@ def randon_1_LS(indivisual: Chromosome , is_limited = False , mode = 0):
     
     # Lấy thứ tự adaptive
     if mode == 0:
-        chosen_method = random.choices(config.LS_METHODS)[0]
+        chosen_method = random.choices(list(methods.keys()))[0]
     else:
         chosen_method = get_adaptive_order(indivisual , methods , mode=mode)[0]
     i = 0
@@ -460,8 +459,12 @@ def randon_1_LS(indivisual: Chromosome , is_limited = False , mode = 0):
     while i < 1:
         if config.is_timeout():
             break
-        
-        if methods[chosen_method]():
+        op_begin = time.time()
+        improved = methods[chosen_method]()
+        op_elapsed = time.time() - op_begin
+        if op_elapsed > config.LS_MAX_TIME_PER_OP:
+            print(f"LS: {chosen_method} aborted (per-op time {op_elapsed:.3f}s > {config.LS_MAX_TIME_PER_OP}s)", file=sys.stderr)
+        if improved:
             i +=1 
             counters[chosen_method] += 1
             continue
@@ -628,8 +631,8 @@ def new_crossover(parent1: Chromosome , parent2: Chromosome , PDG_map : Dict[str
             else:
                 node_list = new_PDG_map[key]
                 random_dispatch_nodePair(node_list, parent1.id_to_vehicle, child_solution_1)
-            
-            
+    
+    
     # Kiem tra lai và thêm các node còn thiếu solution 2      
     for key, value in check_valid_2.items():
         if value == 0:
@@ -667,6 +670,8 @@ def new_crossover(parent1: Chromosome , parent2: Chromosome , PDG_map : Dict[str
     print(child_2.fitness , file=sys.stderr)
     return child_1 , child_2
 
+
+# chen lại node list theo chiến lược cheapest insertion
 def new_dispatch_nodePair(node_list: list[Node]  , id_to_vehicle: Dict[str , Vehicle] , vehicleid_to_plan: Dict[str, list[Node]], route_map: Dict[tuple , tuple]  , selected_vehicle: str= None , mode = 'total' ):
     bestInsertVehicleID: str = ''
     bestInsertPosI: int = 0
@@ -748,3 +753,799 @@ def new_dispatch_nodePair(node_list: list[Node]  , id_to_vehicle: Dict[str , Veh
 
                 tempRouteNodeList.pop(j)
     return isExhausive , bestInsertVehicleID, bestInsertPosI, bestInsertPosJ , bestNodeList
+
+
+#====================================================================================================================================================================
+
+
+def extract_block_from_solution (vehicleid_to_plan : Dict[str , List[Node]] , id_to_vehicle : Dict[str , Vehicle]) -> Dict[str , List[Node]]:
+    dis_order_super_node , _ = get_UnongoingSuperNode(vehicleid_to_plan , id_to_vehicle)
+    
+    ls_node_pair_num = len(dis_order_super_node)
+    if ls_node_pair_num == 0:
+        return False
+    
+    vehicleID = None
+    block_map : Dict[str , List[Node]] = {}
+    for idx , pdg in dis_order_super_node.items():
+        pickup_node : Node = None
+        delivery_node : Node = None
+        node_list :List[Node] = []
+        posI :int =0 ; posJ : int= 0
+        dNum : int= len(pdg) // 2
+        index :int= 0
+        if pdg:
+            for v_and_pos_str, node in pdg.items():
+                if index % 2 == 0:
+                    vehicleID = v_and_pos_str.split(",")[0]
+                    posI = int(v_and_pos_str.split(",")[1])
+                    pickup_node = node
+                    node_list.insert(0, pickup_node)
+                    index += 1
+                else:
+                    posJ = int(v_and_pos_str.split(",")[1])
+                    delivery_node = node
+                    node_list.append(delivery_node)
+                    index += 1
+                    posJ = posJ - dNum + 1
+            
+            vehicle_node_route : List[Node] = vehicleid_to_plan.get(vehicleID , [])
+            
+            for i in range(posI + dNum , posJ):
+                node_list.insert(i - posI , vehicle_node_route[i])
+
+            k : str = f"{vehicleID},{posI}+{posJ + dNum - 1}"    
+            block_map[k] = node_list
+    
+    return block_map
+
+# chấm điểm cho dựa trên cấu trúc của block
+def block_scoring_func(blockmap: Dict[str, List[Node]],
+                      vehicleid_to_plan1: Dict[str, List[Node]],
+                      vehicleid_to_plan2: Dict[str, List[Node]],
+                      route_map: Dict[Tuple[str, str], Tuple[float, float]]) -> Dict[str, Tuple[float, float, float]]:
+    """Tính điểm cho từng block và trả về 3 chỉ số:
+    (avg_distance, avg_time, avg_demand)
+
+    - avg_distance: trung bình quãng đường giữa các cặp node liên tiếp.
+    - avg_time: trung bình thời gian di chuyển giữa các cặp node liên tiếp.
+    - avg_demand: trung bình demand của tất cả item (pickup + delivery) xuất hiện trong block.
+
+    Các block không hợp lệ (số node < 2 hoặc số node lẻ) trả về (inf, inf, inf).
+    Nếu không có cạnh hợp lệ (edge_count == 0) thì avg_distance = avg_time = 0.0 nhưng vẫn tính avg_demand.
+    """
+    block_scores: Dict[str, Tuple[float, float, float]] = {}
+
+    if not blockmap:
+        return block_scores
+
+    for block_key, node_list in blockmap.items():
+        if not node_list or len(node_list) % 2 != 0 or len(node_list) < 2:
+            block_scores[block_key] = (math.inf, math.inf, math.inf)
+            continue
+
+        total_distance = 0.0
+        total_time = 0.0
+        edge_count = 0
+        total_demand = 0.0
+        item_count = 0
+
+        # Tính demand trung bình trước (không phụ thuộc vào cạnh hợp lệ)
+        for nd in node_list:
+            if nd.pickup_item_list:
+                for it in nd.pickup_item_list:
+                    if hasattr(it, 'demand'):
+                        total_demand += it.demand
+                        item_count += 1
+            if nd.delivery_item_list:
+                for it in nd.delivery_item_list:
+                    if hasattr(it, 'demand'):
+                        total_demand += it.demand
+                        item_count += 1
+        avg_demand = (total_demand / item_count) if item_count > 0 else 0.0
+
+        # Duyệt các cặp node liên tiếp để lấy distance/time
+        for i in range(len(node_list) - 1):
+            n1 = node_list[i]
+            n2 = node_list[i + 1]
+            if not n1 or not n2:
+                continue
+            key = (n1.id, n2.id)
+            dis_time = route_map.get(key)
+            if dis_time is None:
+                dis_time = route_map.get((n2.id, n1.id))
+            if dis_time is None:
+                continue
+            try:
+                distance_val = float(dis_time[0])
+                time_val = float(dis_time[1])
+            except (ValueError, TypeError, IndexError):
+                continue
+            total_distance += distance_val
+            total_time += time_val
+            edge_count += 1
+
+        if edge_count == 0:
+            avg_distance = 0.0
+            avg_time = 0.0
+        else:
+            avg_distance = total_distance / edge_count
+            avg_time = total_time / edge_count
+
+        block_scores[block_key] = (avg_distance, avg_time, avg_demand)
+
+    return block_scores
+
+def cheapest_insertion_for_block(node_block: List[Node] , id_to_vehicle: Dict[str , Vehicle] , vehicleid_to_plan: Dict[str, list[Node]], route_map: Dict[tuple , tuple] , selected_vehicle: str= None):
+    temp_vehicleid_to_plan : Dict[str , List[Node]] = copy.deepcopy(vehicleid_to_plan)
+    minCostDelta = math.inf 
+    bestInsertPos = 0
+    bestInsertVehicleID : str  = None
+    
+    for vehicleID , vehicle in id_to_vehicle.items():
+        if selected_vehicle is not None and vehicleID != selected_vehicle:
+            continue
+        
+        vehicle_plan = vehicleid_to_plan[vehicleID]
+        
+        node_list_size = len(vehicle_plan) if vehicle_plan else 0
+
+        insert_pos = 1 if vehicle.des else 0
+        
+        for i in range(insert_pos , node_list_size  +1):
+            tempRouteNodeList = copy.deepcopy(vehicle_plan) if vehicle_plan else []
+            
+            tempRouteNodeList[i: i] = node_block
+            
+            carrying_items = vehicle.carrying_items if vehicle.des else []
+            if isFeasible(tempRouteNodeList , carrying_items , vehicle.board_capacity):
+                tmp_cost = cost_of_a_route(tempRouteNodeList , vehicle , id_to_vehicle , route_map , temp_vehicleid_to_plan)
+                if tmp_cost < minCostDelta:
+                    minCostDelta = tmp_cost
+                    bestInsertPos = i
+                    bestInsertVehicleID = vehicleID
+            
+            del tempRouteNodeList[i: i+ len(node_block)]
+
+    return bestInsertPos , bestInsertVehicleID
+
+# ================== Block map update with overlap removal & optional salvage (LIFO assumption) ==================
+# Thay vì lưu toàn bộ item id, chỉ lưu chữ ký nhóm pickup-delivery: "{count}_{anchor_item_id}"
+# anchor_item_id: pickup -> first item id; delivery -> last item id (theo quy ước new_PDG_map)
+def update_blockmap(blockmap1 : Dict[str, List[Node]] , blockmap2 : Dict[str , List[Node]] , used_block_nodes: List[Node] , used_signatures : set[str]):
+    """Cập nhật blockmap sau khi chèn một block.
+
+    Tối ưu hiệu năng: chỉ đánh dấu các nhóm PD bằng chữ ký (len_pick_list + '_' + first_pick_id)
+    tương thích với key của new_PDG_map. Delivery node có chữ ký (len_delivery_list + '_' + last_delivery_id) và
+    giả định first pickup id == last delivery id cho cùng nhóm -> hai chữ ký trùng nhau.
+
+    Các bước:
+    1. Thu thập chữ ký pickup trong block vừa dùng -> thêm vào used_signatures.
+    2. Với mỗi block còn lại: nếu giao chữ ký mới -> tách salvage (trái/phải) bỏ phần giao.
+    3. Chỉ giữ segment hợp lệ (balanced LIFO, số nút chẵn >=2, không chứa chữ ký đã dùng).
+    4. Xóa block gốc trùng/giao; thêm các segment mới (tối đa 2).
+    5. Dọn dẹp block nào vẫn chứa chữ ký đã dùng.
+    """
+    if not used_block_nodes:
+        return
+    
+    def pickup_signature(nd: Node) -> Optional[str]:
+        if nd.pickup_item_list:
+            return f"{len(nd.pickup_item_list)}_{nd.pickup_item_list[0].id}"
+        return None
+
+    def delivery_signature(nd: Node) -> Optional[str]:
+        if nd.delivery_item_list:
+            return f"{len(nd.delivery_item_list)}_{nd.delivery_item_list[-1].id}"
+        return None
+
+    # Tạo tập chữ ký mới từ block vừa dùng (dùng pickup đủ, nhưng thêm delivery để chắc chắn)
+    new_used_set : set[str] = set()
+    for nd in used_block_nodes:
+        sig_p = pickup_signature(nd)
+        if sig_p: new_used_set.add(sig_p)
+        sig_d = delivery_signature(nd)
+        if sig_d: new_used_set.add(sig_d)
+    used_signatures.update(new_used_set)
+
+    # Kiểm tra LIFO balanced nhanh dựa trên chữ ký (stack chữ ký pickup, delivery phải trùng)
+    def is_lifo_balanced(nodes: List[Node]) -> bool:
+        stack : List[str] = []
+        for nd in nodes:
+            sig_p = pickup_signature(nd)
+            if sig_p:
+                stack.append(sig_p)
+            sig_d = delivery_signature(nd)
+            if sig_d:
+                if not stack or stack[-1] != sig_d:
+                    return False
+                stack.pop()
+        return len(stack) == 0
+
+    salvage_min_pairs = 1          # keep residual only if at least this many pickup-delivery pairs
+    salvage_min_ratio = 0.0         # set >0 (e.g. 0.5) to enforce size ratio vs original, 0 disables
+    max_new_segments_per_block = 2  # with LIFO we expect at most 2
+
+    def process_blockmap(bmap: Dict[str, List[Node]]):
+        if not bmap:
+            return
+        to_delete : List[str] = []
+        to_add : List[Tuple[str, List[Node]]] = []
+        # iterate over snapshot because we will modify after
+        for key, nodes in list(bmap.items()):
+            if not nodes:
+                to_delete.append(key)
+                continue
+            # Thu thập chữ ký pickup của block
+            block_pick_sigs : List[str] = []
+            block_all_sigs : set[str] = set()
+            for nd in nodes:
+                sp = pickup_signature(nd)
+                if sp:
+                    block_pick_sigs.append(sp)
+                    block_all_sigs.add(sp)
+                sd = delivery_signature(nd)
+                if sd:
+                    block_all_sigs.add(sd)
+
+            # Nếu không giao với chữ ký mới nhưng đã dùng trước đó -> xóa; nếu không thì giữ nguyên
+            if block_all_sigs.isdisjoint(new_used_set):
+                if not block_all_sigs.isdisjoint(used_signatures - new_used_set):
+                    to_delete.append(key)
+                continue
+
+            # If this block is exactly the inserted block (same length & node identity/order) -> remove directly
+            if len(nodes) == len(used_block_nodes) and all(a is b for a,b in zip(nodes, used_block_nodes)):
+                to_delete.append(key)
+                continue
+
+            # Attempt salvage: split into contiguous segments whose nodes do NOT contain any newly used item ids
+            segments : List[List[Node]] = []
+            current : List[Node] = []
+            def node_has_new_sig(nd: Node) -> bool:
+                sp = pickup_signature(nd)
+                if sp and sp in new_used_set: return True
+                sd = delivery_signature(nd)
+                if sd and sd in new_used_set: return True
+                return False
+            for nd in nodes:
+                if node_has_new_sig(nd):
+                    if current:
+                        segments.append(current)
+                        current = []
+                else:
+                    current.append(nd)
+            if current:
+                segments.append(current)
+
+            # Evaluate & keep valid segments
+            added_segments = 0
+            for idx, seg in enumerate(segments):
+                if added_segments >= max_new_segments_per_block:
+                    break
+                if len(seg) < 2 or len(seg) % 2 != 0:
+                    continue
+                if not is_lifo_balanced(seg):
+                    continue
+                # Tính số cặp = số pickup signature trong segment
+                seg_pick_sigs = []
+                seg_all_sigs : set[str] = set()
+                for nd in seg:
+                    sp = pickup_signature(nd)
+                    if sp:
+                        seg_pick_sigs.append(sp)
+                        seg_all_sigs.add(sp)
+                    sd = delivery_signature(nd)
+                    if sd:
+                        seg_all_sigs.add(sd)
+                # Loại nếu có chữ ký đã dùng
+                if not seg_all_sigs.isdisjoint(used_signatures):
+                    continue
+                pair_count = len(seg_pick_sigs)
+                pair_count = len(seg) // 2
+                if pair_count < salvage_min_pairs:
+                    continue
+                if salvage_min_ratio > 0 and (len(seg)/len(nodes)) < salvage_min_ratio:
+                    continue
+                # create new key
+                new_key = f"{key}|r{idx}"
+                # avoid key collision
+                suffix = 0
+                base_new_key = new_key
+                while new_key in bmap or any(k == new_key for k,_ in to_add):
+                    suffix += 1
+                    new_key = f"{base_new_key}_{suffix}"
+                to_add.append((new_key, seg))
+                added_segments += 1
+
+            # original block removed regardless once processed (overlapped)
+            to_delete.append(key)
+
+        # apply deletions
+        for k in to_delete:
+            bmap.pop(k, None)
+        # add salvage blocks
+        for k, seg in to_add:
+            bmap[k] = seg
+
+        # final safety: remove any block accidentally containing used signatures
+        purge_keys = []
+        for k, nodes in bmap.items():
+            has_used = False
+            for nd in nodes:
+                sp = pickup_signature(nd)
+                if sp and sp in used_signatures:
+                    has_used = True
+                    break
+                sd = delivery_signature(nd)
+                if sd and sd in used_signatures:
+                    has_used = True
+                    break
+            if has_used:
+                purge_keys.append(k)
+        for k in purge_keys:
+            bmap.pop(k, None)
+
+    process_blockmap(blockmap1)
+    process_blockmap(blockmap2)
+
+
+# ================== Simple block map update (NO salvage) ==================
+def update_blockmap_drop_overlap(blockmap1: Dict[str, List[Node]],
+                                 blockmap2: Dict[str, List[Node]],
+                                 used_block_nodes: List[Node],
+                                 used_signatures: set[str]):
+    """Cập nhật blockmap nhưng KHÔNG tái sử dụng (salvage) phần còn lại của các block overlap.
+
+    Khác với `update_blockmap` (có salvage segment), hàm này chỉ đơn giản:
+    1. Thu thập chữ ký (signature) của toàn bộ pickup & delivery trong block vừa dùng.
+    2. Thêm các chữ ký đó vào `used_signatures` (tập toàn cục các nhóm đã chọn).
+    3. Xóa mọi block chứa bất kỳ chữ ký nào đã dùng (bao gồm mới và cũ).
+       => Loại bỏ triệt để overlap, không giữ lại phần còn lại để tránh rủi ro nhiễu cấu trúc.
+
+    Ưu điểm:
+    - Nhanh, đơn giản, tránh tạo nhiều block nhỏ gây phân mảnh.
+    - Hữu ích nếu heuristic salvage làm giảm chất lượng hoặc gây quá nhiều block nhỏ.
+
+    Nhược điểm:
+    - Có thể bỏ lỡ cơ hội tái sử dụng phần “sạch” còn lại của block lớn.
+
+    Tham số:
+    - blockmap1, blockmap2: hai dict block của 2 parent.
+    - used_block_nodes: list node của block vừa chèn (có thể None / rỗng nếu vòng đầu tiên).
+    - used_signatures: set lưu chữ ký đã chọn qua các vòng trước (sẽ được cập nhật tại chỗ).
+    """
+    if not used_block_nodes:
+        return
+
+    def pickup_signature(nd: Node) -> Optional[str]:
+        if nd.pickup_item_list:
+            return f"{len(nd.pickup_item_list)}_{nd.pickup_item_list[0].id}"
+        return None
+
+    def delivery_signature(nd: Node) -> Optional[str]:
+        if nd.delivery_item_list:
+            return f"{len(nd.delivery_item_list)}_{nd.delivery_item_list[-1].id}"
+        return None
+
+    # 1. Thu thập chữ ký mới
+    new_used_set: set[str] = set()
+    for nd in used_block_nodes:
+        sp = pickup_signature(nd)
+        if sp:
+            new_used_set.add(sp)
+        sd = delivery_signature(nd)
+        if sd:
+            new_used_set.add(sd)
+    used_signatures.update(new_used_set)
+
+    def purge(bmap: Dict[str, List[Node]]):
+        if not bmap:
+            return
+        to_delete: List[str] = []
+        for key, nodes in bmap.items():
+            if not nodes:
+                to_delete.append(key)
+                continue
+            remove_block = False
+            if len(nodes) == len(used_block_nodes) and all(a is b for a, b in zip(nodes, used_block_nodes)):
+                # Chính là block vừa dùng
+                remove_block = True
+            else:
+                for nd in nodes:
+                    sp = pickup_signature(nd)
+                    if sp and sp in used_signatures:
+                        remove_block = True
+                        break
+                    sd = delivery_signature(nd)
+                    if sd and sd in used_signatures:
+                        remove_block = True
+                        break
+            if remove_block:
+                to_delete.append(key)
+        for k in to_delete:
+            bmap.pop(k, None)
+
+    purge(blockmap1)
+    purge(blockmap2)
+
+def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_plan : Dict[str , List[Node]] , PDG_map: Dict[str , List[Node]] ):
+    
+    # Cac super node
+    new_PDG_map : Dict[str , List[Node]] = {}
+    for key , value in PDG_map.items():
+        key = f'{len(value[0].pickup_item_list)}_{value[0].pickup_item_list[0].id}'
+        new_PDG_map[key] = value
+        
+    check_valid : Dict[str , int]= {key : 0 for key in new_PDG_map.keys()}
+    
+    blockmap_parent1 = extract_block_from_solution(parent1.solution , parent1.id_to_vehicle)
+    blockmap_parent2 = extract_block_from_solution(parent2.solution , parent2.id_to_vehicle)
+
+    # ========= Khởi tạo biến điều khiển vòng lặp =========
+    start_time = time.time()
+    iteration = 0
+    stagnation = 0  # số vòng không thu thêm signature mới
+    total_blocks_target = len(new_PDG_map) if new_PDG_map else 0
+    # Tham số dừng (có thể điều chỉnh / đưa ra ngoài nếu cần tinh chỉnh sau)
+    MAX_ITER = max(5, 2 * total_blocks_target) if total_blocks_target > 0 else 20
+    MAX_NO_GAIN = 5          # số vòng liên tiếp không có gain mới thì dừng
+    TIME_BUDGET_SEC = 10   # ngân sách thời gian cho riêng crossover này
+    MIN_GAIN_PER_BLOCK = 1   # yêu cầu tối thiểu signature mới / vòng
+
+    # Ghi lại lý do dừng cuối cùng (debug)
+    last_stop_reason = None
+
+    def is_finished() -> bool:
+        """Điều kiện dừng tổng hợp cho vòng lặp chọn block.
+
+        Các tiêu chí:
+        1. Timeout toàn cục (config.is_timeout()).
+        2. Hết block (cả hai map rỗng hoặc None).
+        3. Đủ coverage (số signature đã dùng >= tổng số super nhóm ban đầu).
+        4. Quá số vòng lặp tối đa.
+        5. Vượt ngân sách thời gian cục bộ.
+        6. Stagnation (không có gain mới quá MAX_NO_GAIN).
+        """
+        nonlocal last_stop_reason
+        # 1. Timeout toàn cục
+        if hasattr(config, 'is_timeout') and config.is_timeout():
+            last_stop_reason = 'global-timeout'
+            return True
+        # 2. Hết block
+        empty1 = (not blockmap_parent1) or (len(blockmap_parent1) == 0)
+        empty2 = (not blockmap_parent2) or (len(blockmap_parent2) == 0)
+        if empty1 and empty2:
+            last_stop_reason = 'no-blocks-left'
+            return True
+        # 3. Coverage đủ
+        if total_blocks_target > 0 and len(used_signatures) >= total_blocks_target:
+            last_stop_reason = 'coverage-complete'
+            return True
+        # 4. Quá số vòng
+        if iteration >= MAX_ITER:
+            last_stop_reason = 'max-iter'
+            return True
+        # 5. Hết ngân sách thời gian cục bộ
+        if (time.time() - start_time) >= TIME_BUDGET_SEC:
+            last_stop_reason = 'time-budget'
+            return True
+        # 6. Stagnation
+        if stagnation >= MAX_NO_GAIN:
+            last_stop_reason = 'stagnation'
+            return True
+        return False
+    
+    def find_best_block(blockmap1: Dict[str, List[Node]],
+                        blockmap2: Dict[str, List[Node]],
+                        blockscore1: Dict[str, Tuple[float, float, float]],
+                        blockscore2: Dict[str, Tuple[float, float, float]]):
+        """Chọn block tốt nhất theo 2 bước:
+        1. Hợp nhất các block từ 2 parent và thực hiện non-dominated sorting trên 2 mục tiêu (avg_distance, avg_time) => Front 0.
+        2. Trong Front 0 chọn block có average demand lớn nhất (tie-break: nhỏ nhất (avg_distance + avg_time)).
+        Trả về danh sách Node của block tốt nhất hoặc None nếu không có.
+        """
+        candidates = []  # (key, nodes, avg_dis, avg_time, avg_demand)
+
+        # Gom ứng viên từ parent 1
+        for k, nodes in (blockmap1 or {}).items():
+            if not nodes:
+                continue
+            score = blockscore1.get(k)
+            if score is None:
+                continue
+            avg_dis, avg_time, avg_demand = score
+            if math.isinf(avg_dis) or math.isinf(avg_time) or math.isinf(avg_demand):
+                continue
+            candidates.append((k, nodes, avg_dis, avg_time, avg_demand))
+        # Gom ứng viên từ parent 2
+        for k, nodes in (blockmap2 or {}).items():
+            if not nodes:
+                continue
+            score = blockscore2.get(k)
+            if score is None:
+                continue
+            avg_dis, avg_time, avg_demand = score
+            if math.isinf(avg_dis) or math.isinf(avg_time) or math.isinf(avg_demand):
+                continue
+            candidates.append((k, nodes, avg_dis, avg_time, avg_demand))
+
+        if not candidates:
+            return None
+
+        # Non-dominated filtering (Front 0)
+        front = []
+        for i, ci in enumerate(candidates):
+            _, _, dis_i, time_i, _ = ci
+            dominated = False
+            for j, cj in enumerate(candidates):
+                if i == j:
+                    continue
+                _, _, dis_j, time_j, _ = cj
+                if (dis_j <= dis_i and time_j <= time_i) and (dis_j < dis_i or time_j < time_i):
+                    dominated = True
+                    break
+            if not dominated:
+                front.append(ci)
+
+        if not front:
+            return None
+
+        front.sort(key=lambda x: (x[4], (x[2] + x[3])))
+        best = front[0]
+        return best[1]
+    
+    used_signatures : set[str] = set()
+
+    child_vehicleid_to_plan : Dict[str , List[Node]] = copy.deepcopy(Base_vehicleid_to_plan)
+
+    # ================= Helper functions for validation ==================
+    def pickup_signature_of(nd: Node) -> Optional[str]:
+        if nd and nd.pickup_item_list:
+            return f"{len(nd.pickup_item_list)}_{nd.pickup_item_list[0].id}"
+        return None
+
+    def delivery_signature_of(nd: Node) -> Optional[str]:
+        if nd and nd.delivery_item_list:
+            return f"{len(nd.delivery_item_list)}_{nd.delivery_item_list[-1].id}"
+        return None
+
+    def extract_pickup_signatures(nodes: List[Node]) -> set[str]:
+        sigs = set()
+        for nd in nodes:
+            ps = pickup_signature_of(nd)
+            if ps:
+                sigs.add(ps)
+        return sigs
+
+    def route_is_lifo_valid(route: List[Node]) -> bool:
+        stack: List[str] = []
+        seen_pickups: set[str] = set()
+        for nd in route:
+            ps = pickup_signature_of(nd)
+            if ps:
+                # duplicate pickup signature => invalid (should appear only once as pickup)
+                if ps in seen_pickups:
+                    return False
+                stack.append(ps)
+                seen_pickups.add(ps)
+            ds = delivery_signature_of(nd)
+            if ds:
+                if not stack or stack[-1] != ds:
+                    return False
+                stack.pop()
+        return len(stack) == 0
+
+    def solution_is_valid(solution: Dict[str, List[Node]]) -> bool:
+        for v_route in solution.values():
+            if not route_is_lifo_valid(v_route):
+                return False
+        return True
+
+    # Seed used_signatures from any existing nodes in base plan (avoid re-adding groups already present)
+    for v_nodes in child_vehicleid_to_plan.values():
+        used_signatures.update(extract_pickup_signatures(v_nodes))
+    if used_signatures:
+        print(f"[new_crossver2] Seeded {len(used_signatures)} signatures from base plan", file=sys.stderr)
+    
+    prev_block = None
+    print(f"[new_crossver2] START | total_target_blocks={len(new_PDG_map)}", file=sys.stderr)
+    while True:
+        if is_finished():
+            print(f"[new_crossver2] STOP before-iter reason={last_stop_reason} iter={iteration}", file=sys.stderr)
+            break
+        try:
+            # Log trạng thái đầu vòng lặp (coverage hiện tại trước khi chọn block mới)
+            print(
+                f"[new_crossver2] Iter {iteration} | blocks_p1={len(blockmap_parent1) if blockmap_parent1 else 0} | "
+                f"blocks_p2={len(blockmap_parent2) if blockmap_parent2 else 0} | used_sig={len(used_signatures)}/{total_blocks_target} | "
+                f"stagn={stagnation}",
+                file=sys.stderr
+            )
+
+            # Cập nhật block map với block trước đó
+            update_blockmap(blockmap_parent1, blockmap_parent2, prev_block, used_signatures)
+
+            # Điểm các block
+            block_score_parent1 = block_scoring_func(blockmap_parent1, parent1.solution, parent2.solution, parent1.route_map)
+            block_score_parent2 = block_scoring_func(blockmap_parent2, parent1.solution, parent2.solution, parent1.route_map)
+            candidate_count = (len(block_score_parent1) if block_score_parent1 else 0) + (len(block_score_parent2) if block_score_parent2 else 0)
+            print(f"[new_crossver2] Iter {iteration} | candidate_blocks={candidate_count}", file=sys.stderr)
+
+            best_block = find_best_block(blockmap_parent1, blockmap_parent2, block_score_parent1, block_score_parent2)
+            if not best_block:
+                last_stop_reason = 'no-candidate'
+                print(f"[new_crossver2] Iter {iteration} | no candidates -> stopping", file=sys.stderr)
+                break
+
+            # Lấy key block (nếu xác định được) để log
+            found_key = None
+            for k, v in (blockmap_parent1 or {}).items():
+                if v is best_block:
+                    found_key = f"P1:{k}"
+                    break
+            if not found_key:
+                for k, v in (blockmap_parent2 or {}).items():
+                    if v is best_block:
+                        found_key = f"P2:{k}"
+                        break
+
+            # Hàm tính chữ ký block
+            def block_signatures(nodes: List[Node]) -> set[str]:
+                sigs: set[str] = set()
+                for nd in nodes:
+                    if nd.pickup_item_list:
+                        sigs.add(f"{len(nd.pickup_item_list)}_{nd.pickup_item_list[0].id}")
+                    if nd.delivery_item_list:
+                        sigs.add(f"{len(nd.delivery_item_list)}_{nd.delivery_item_list[-1].id}")
+                return sigs
+
+            new_sigs = block_signatures(best_block)
+            # Skip block if any of its pickup signatures already used (to avoid duplicates & LIFO conflicts)
+            pickup_sigs = {s for s in new_sigs if '_' in s}  # all are pickup style already
+            if any(sig in used_signatures for sig in pickup_sigs):
+                # Remove this exact block from its map to prevent reselection
+                removed_from = None
+                if blockmap_parent1:
+                    for k, v in list(blockmap_parent1.items()):
+                        if v is best_block:
+                            blockmap_parent1.pop(k, None)
+                            removed_from = 'P1'
+                            break
+                if removed_from is None and blockmap_parent2:
+                    for k, v in list(blockmap_parent2.items()):
+                        if v is best_block:
+                            blockmap_parent2.pop(k, None)
+                            removed_from = 'P2'
+                            break
+                print(f"[new_crossver2] Iter {iteration} | skip duplicate-signature block {found_key}", file=sys.stderr)
+                stagnation += 1
+                continue
+
+            gain = len(pickup_sigs - used_signatures)
+            print(
+                f"[new_crossver2] Iter {iteration} | chosen_block_key={found_key} | block_len={len(best_block)} | "
+                f"new_pick_sig_gain={gain}",
+                file=sys.stderr
+            )
+            if gain < MIN_GAIN_PER_BLOCK:
+                stagnation += 1
+            else:
+                stagnation = 0
+
+            # Perform tentative insertion
+            bestInsertPos, bestInsertVehicle = cheapest_insertion_for_block(best_block, parent1.id_to_vehicle, child_vehicleid_to_plan, parent1.route_map)
+            if bestInsertVehicle is None:
+                last_stop_reason = 'no-insertion-position'
+                print(f"[new_crossver2] Iter {iteration} | insertion failed -> stopping", file=sys.stderr)
+                break
+            target_route = child_vehicleid_to_plan[bestInsertVehicle]
+            target_route[bestInsertPos: bestInsertPos] = best_block
+
+            # Validate only the modified vehicle route for LIFO + uniqueness
+            if not route_is_lifo_valid(target_route):
+                # Rollback insertion
+                del target_route[bestInsertPos: bestInsertPos + len(best_block)]
+                # Remove this block from future consideration
+                removed_from = None
+                if blockmap_parent1:
+                    for k, v in list(blockmap_parent1.items()):
+                        if v is best_block:
+                            blockmap_parent1.pop(k, None)
+                            removed_from = 'P1'
+                            break
+                if removed_from is None and blockmap_parent2:
+                    for k, v in list(blockmap_parent2.items()):
+                        if v is best_block:
+                            blockmap_parent2.pop(k, None)
+                print(f"[new_crossver2] Iter {iteration} | rollback block {found_key} (violates LIFO/dup)", file=sys.stderr)
+                stagnation += 1
+                continue
+
+            # Update coverage after successful insertion
+            used_signatures.update(pickup_sigs)
+            print(
+                f"[new_crossver2] Iter {iteration} | inserted at vehicle={bestInsertVehicle} pos={bestInsertPos} | "
+                f"coverage={len(used_signatures)}/{total_blocks_target}",
+                file=sys.stderr
+            )
+
+            prev_block = best_block
+            iteration += 1
+        except Exception as e:
+            last_stop_reason = 'exception'
+            print(f"[new_crossver2] Iter {iteration} | EXCEPTION: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            break
+    print(
+        f"[new_crossver2] END | iterations={iteration} | coverage={len(used_signatures)}/{total_blocks_target} | "
+        f"used_signatures={len(used_signatures)} | final_reason={last_stop_reason}",
+        file=sys.stderr
+    )
+    
+    # kiểm tra lại lời giải con và xử lý các node thừa hoặc thiếu
+    for vehicleID in parent1.id_to_vehicle.keys():
+        redundant = []
+        del_index = []
+        # Duyệt ngược danh sách để tìm và xóa nút thừa    
+        for i in range(len(child_vehicleid_to_plan[vehicleID]) - 1, -1, -1):  
+            node = child_vehicleid_to_plan[vehicleID][i]
+            
+            if node.pickup_item_list:
+                if redundant and node.pickup_item_list[0].id == redundant[-1]:
+                    redundant.pop()  # Loại bỏ phần tử tương ứng trong danh sách `redundant`
+                    del_index.append(i)
+            else:
+                key = f'{len(node.delivery_item_list)}_{node.delivery_item_list[-1].id}'
+                
+                if key in new_PDG_map:
+                    check_valid[key] += 1
+                    
+                    # nếu tìm được một super node thừa
+                    if check_valid[key] > 1:
+                        first_itemID_of_redundant_supernode = key.split('_')[-1]
+                        redundant.append(first_itemID_of_redundant_supernode)
+                        #print(f"Redundant nodes: {redundant}" , file= sys.stderr)
+                        # Xóa node giao của super node thừa
+                        del_index.append(i)
+                        #print('Đã xóa 1 super node thừa' , file= sys.stderr)
+        for i in del_index:
+            child_vehicleid_to_plan[vehicleID].pop(i)
+    
+    
+    # Kiem tra lai và thêm các node còn thiếu vào con   
+    for key, value in check_valid.items():
+        if value == 0:
+            if random.uniform(0 , 1) < 1:
+                # truong hop bi thieu 1 super node thi gan theo chien luoc CI vao solution hien tai
+                selected_vehicleID = random.choice(list(parent1.id_to_vehicle.keys()))
+                node_list = new_PDG_map[key]
+                isExhausive = False
+                route_node_list : List[Node] = []
+                
+                if node_list:
+                    # Sửa tham chiếu: dùng child_vehicleid_to_plan thay vì biến không tồn tại child_solution_1
+                    isExhausive , bestInsertVehicleID, bestInsertPosI, bestInsertPosJ , bestNodeList = new_dispatch_nodePair(
+                        node_list , parent1.id_to_vehicle , child_vehicleid_to_plan , parent1.route_map ,selected_vehicleID
+                    )
+                    
+                route_node_list = child_vehicleid_to_plan.get(bestInsertVehicleID , [])
+                if isExhausive:
+                    route_node_list = bestNodeList[:]
+                else:
+                    if route_node_list is None:
+                        route_node_list = []
+                    
+                    new_order_pickup_node = node_list[0]
+                    new_order_delivery_node = node_list[1]
+                    
+                    route_node_list.insert(bestInsertPosI, new_order_pickup_node)
+                    route_node_list.insert(bestInsertPosJ, new_order_delivery_node)
+                child_vehicleid_to_plan[bestInsertVehicleID] = route_node_list
+            else:
+                node_list = new_PDG_map[key]
+                random_dispatch_nodePair(node_list, parent1.id_to_vehicle, child_vehicleid_to_plan)
+    
+    
+    return Chromosome(child_vehicleid_to_plan , parent1.route_map , parent1.id_to_vehicle)

@@ -228,7 +228,9 @@ class SimulateEnvironment(object):
         if not self.algorithm_calling_command:
             self.algorithm_calling_command = get_algorithm_calling_command()
         time_start_algorithm = time.time()
-        used_seconds, message = subprocess_function(self.algorithm_calling_command)
+        used_seconds, message = subprocess_function(
+            self.algorithm_calling_command
+        )
         logger.info(message)
 
         # 3. parse the output json of the algorithm
