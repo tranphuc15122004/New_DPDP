@@ -46,7 +46,7 @@ def GAVND_4(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
         # Tạo con (có giới hạn số lần thử để tránh vòng lặp vô hạn ở test nhỏ)
         target_size =  config.POPULATION_SIZE
         attempt = 0
-        max_attempt = max(50, config.POPULATION_SIZE)
+        max_attempt = config.POPULATION_SIZE
         while len(new_population) < target_size and attempt < max_attempt:
             attempt += 1
             parent1, parent2 = select_parents(population)
@@ -80,7 +80,6 @@ def GAVND_4(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
         
         population.sort(key=lambda x: x.fitness)
         population = population[:config.POPULATION_SIZE]
-                
         if population[0].fitness < best_solution.fitness: config.IMPROVED_IN_CROSS += 1
         
         population.sort(key=lambda x: x.fitness)
@@ -89,19 +88,15 @@ def GAVND_4(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
             h_sig = hashlib.sha1(sig_str.encode('utf-8')).hexdigest()
             if population[c].cant_improved == False and h_sig not in cant_improved_list:
                 adaptive_LS_stategy(population[c] , True, mode=1, tabu_list=global_tabu, global_best=best_solution , global_population = population)
+                #randon_1_LS(population[c] , False)
             if population[c].cant_improved:
                 cant_improved_list.append(h_sig)
+                population.pop(c)
+                if best_solution is None or population[c].fitness < best_solution.fitness:
+                    best_solution = copy.deepcopy(population[c])
         
-        """ population.sort(key=lambda x: x.fitness)
-        population = population[:config.POPULATION_SIZE]
-        if config.USE_TABU: 
-            for c in range(len(population)):
-                sig_str = get_route_after(population[c].solution , {})
-                h_sig = hashlib.sha1(sig_str.encode('utf-8')).hexdigest()
-                if h_sig not in global_tabu:
-                    global_tabu.append(h_sig)
-                    if len(global_tabu) > config.TABU_LIST_SIZE:
-                        global_tabu.popleft() """
+        population.sort(key=lambda x: x.fitness)
+
         if population[0].fitness < best_solution.fitness: config.IMPROVED_IN_MUTATION += 1
         
         
@@ -120,7 +115,7 @@ def GAVND_4(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
             f'Time: {time.time() - begin_gen_time}')
 
         # Điều kiện dừng
-        if stagnant_generations >= 5 :
+        if stagnant_generations >= 5 or avg  == population[0].fitness:
             print("Stopping early due to lack of improvement.")
             break
 
@@ -205,7 +200,7 @@ def adaptive_LS_stategy(indivisual: Chromosome, is_limited=True , mode = 1, tabu
     from algorithm.engine import get_route_after
     current_signature_str = get_route_after(indivisual.solution, {})
     h_current_signature = hashlib.sha1(current_signature_str.encode('utf-8')).hexdigest()
-    if config.USE_TABU and tabu_list is not None and h_current_signature not in tabu_list:
+    if config.USE_TABU_IN_LS and tabu_list is not None and h_current_signature not in tabu_list:
         tabu_list.append(h_current_signature)
         if len(tabu_list) > config.TABU_LIST_SIZE:
             tabu_list.popleft()

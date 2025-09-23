@@ -13,8 +13,8 @@ BEGIN_TIME = 0
 ALGO_TIME_LIMIT = 9*60+30
 
 # Tabu Search configuration (for hybrid GA + TS in GAVND4)
-USE_TABU = True              # Enable/disable tabu filtering in local search
-USE_TABU_IN_LS = True
+USE_TABU = False              # Enable/disable tabu filtering in local search
+USE_TABU_IN_LS = False          
 TABU_LIST_SIZE = 200         # Max number of recent route signatures to remember
 TABU_ACCEPT_BETTER = True    # Allow tabu move if it improves global best
 
@@ -33,7 +33,7 @@ def get_remaining_time() -> float:
 
 
 """GA configuration"""
-POPULATION_SIZE = 50
+POPULATION_SIZE = 40
 NUMBER_OF_GENERATION = 20
 MUTATION_RATE = 0.1
 LS_MAX = 10
@@ -41,7 +41,7 @@ IMPROVED_IN_CROSS = 0
 IMPROVED_IN_MUTATION = 0
 IMPROVED_IN_DIVER = 0
 """Per local search time limit (seconds). Each LS operator should stop when exceeding this budget."""
-LS_MAX_TIME_PER_OP = 6  # seconds (adjustable)
+LS_MAX_TIME_PER_OP = 5  # seconds (adjustable)
 
 """ ACO configuration """
 POPULATION_SIZE_ACO = 20
