@@ -1,73 +1,27 @@
 {
-    "V_1": {
-        "factory_id": "32ab2049f3fb437881ff3912470d7840",
-        "lng": 116.7112,
-        "lat": 40.3527,
-        "delivery_item_list": [
-            "2242090093-12",
-            "2242090093-11",
-            "2242090093-10",
-            "2242090093-9",
-            "2242090093-8",
-            "2242090093-7",
-            "2242090093-6",
-            "2242090093-5",
-            "2242090093-4",
-            "2242090093-3",
-            "2242090093-2",
-            "2242090093-1"
-        ],
-        "pickup_item_list": [],
-        "arrive_time": 1758652296,
-        "leave_time": 0
-    },
+    "V_1": null,
     "V_2": {
-        "factory_id": "b6dd694ae05541dba369a2a759d2c2b9",
-        "lng": 116.6264,
-        "lat": 40.2253,
-        "delivery_item_list": [
-            "2204110090-1",
-            "2358590100-1"
-        ],
-        "pickup_item_list": [],
-        "arrive_time": 1758653820,
-        "leave_time": 0
-    },
-    "V_3": {
         "factory_id": "9f1a09c368584eba9e7f10a53d55caae",
         "lng": 116.6309,
         "lat": 40.2304,
         "delivery_item_list": [
-            "2324550095-1",
-            "2209540091-1"
+            "0020420003-1"
         ],
         "pickup_item_list": [],
-        "arrive_time": 1758653964,
+        "arrive_time": 1758566796,
         "leave_time": 0
     },
-    "V_4": {
-        "factory_id": "9f1a09c368584eba9e7f10a53d55caae",
-        "lng": 116.6309,
-        "lat": 40.2304,
-        "delivery_item_list": [
-            "2201410089-1"
-        ],
-        "pickup_item_list": [],
-        "arrive_time": 1758653688,
-        "leave_time": 0
-    },
+    "V_3": null,
+    "V_4": null,
     "V_5": {
-        "factory_id": "ffd0ed8719f54294a452ed3e3b6a986c",
-        "lng": 116.6296,
-        "lat": 40.2253,
-        "delivery_item_list": [
-            "2218260092-4",
-            "2218260092-3",
-            "2218260092-2",
-            "2218260092-1"
+        "factory_id": "9b40bfd6ca1c432498685540652a5a8b",
+        "lng": 116.7099,
+        "lat": 40.3517,
+        "delivery_item_list": [],
+        "pickup_item_list": [
+            "0034410007-1"
         ],
-        "pickup_item_list": [],
-        "arrive_time": 1758654660,
+        "arrive_time": 1758565296,
         "leave_time": 0
     }
 }

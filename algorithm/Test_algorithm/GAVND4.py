@@ -38,11 +38,16 @@ def GAVND_4(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
             print(f"TimeOut!! Elapsed: {elapsed_time:.1f}s")
             break
         
+        elite_count = max(1, int(config.POPULATION_SIZE * 0.3))
+        if elite_count > len(population):
+            elite_count = len(population)
+        new_population = population[:elite_count]
+        
         # Tạo con (có giới hạn số lần thử để tránh vòng lặp vô hạn ở test nhỏ)
-        target_size = 2 * config.POPULATION_SIZE
+        target_size =  config.POPULATION_SIZE
         attempt = 0
         max_attempt = max(50, config.POPULATION_SIZE)
-        while len(population) < target_size and attempt < max_attempt:
+        while len(new_population) < target_size and attempt < max_attempt:
             attempt += 1
             parent1, parent2 = select_parents(population)
             if not parent1 or not parent2:
@@ -58,7 +63,9 @@ def GAVND_4(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
                 global_tabu.append(h_sig)
                 if len(global_tabu) > config.TABU_LIST_SIZE:
                     global_tabu.popleft()
-            population.append(child)
+            new_population.append(child)
+
+        population = new_population[:config.POPULATION_SIZE]
 
         # Fallback: nếu không đủ số lượng (do tabu chặn hết), nhân bản elite
         if len(population) < target_size:
