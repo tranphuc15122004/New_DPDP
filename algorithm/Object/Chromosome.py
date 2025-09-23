@@ -14,6 +14,7 @@ class Chromosome:
         self.route_map = route_map
         self.id_to_vehicle = id_to_vehicle
         self.improved_LS_map = {method: 0 for method in config.LS_METHODS}
+        self.cant_improved = False
 
 
     @property

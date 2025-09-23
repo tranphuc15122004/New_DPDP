@@ -12,6 +12,12 @@ LS_METHODS = ['PDPairExchange', 'BlockExchange', 'BlockRelocate', 'mPDG', '2opt'
 BEGIN_TIME = 0
 ALGO_TIME_LIMIT = 9*60+30
 
+# Tabu Search configuration (for hybrid GA + TS in GAVND4)
+USE_TABU = True              # Enable/disable tabu filtering in local search
+USE_TABU_IN_LS = True
+TABU_LIST_SIZE = 200         # Max number of recent route signatures to remember
+TABU_ACCEPT_BETTER = True    # Allow tabu move if it improves global best
+
 def set_begin_time():
     """Set the start time for algorithm execution"""
     global BEGIN_TIME
@@ -27,9 +33,9 @@ def get_remaining_time() -> float:
 
 
 """GA configuration"""
-POPULATION_SIZE = 20
+POPULATION_SIZE = 15
 NUMBER_OF_GENERATION = 20
-MUTATION_RATE = 0.2
+MUTATION_RATE = 0.5
 LS_MAX = 10
 IMPROVED_IN_CROSS = 0
 IMPROVED_IN_MUTATION = 0

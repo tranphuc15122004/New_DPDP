@@ -5,6 +5,8 @@ import random
 import time
 from algorithm.engine import *
 from algorithm.Test_algorithm.new_LS import *
+from collections import deque
+import hashlib
 from algorithm.Test_algorithm.new_engine import *
 from algorithm.Test_algorithm.new_LS import *
 
@@ -24,6 +26,10 @@ def GAVND_4(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
     best_solution = population[0]
     # Elite size
     
+    # Global Tabu list across generations (store SHA1 hex of route signatures)
+    global_tabu = deque()
+    cant_improved_list = []
+
     for gen in range(config.NUMBER_OF_GENERATION):
         # Kiểm tra timeout
         begin_gen_time = time.time()
@@ -32,13 +38,36 @@ def GAVND_4(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
             print(f"TimeOut!! Elapsed: {elapsed_time:.1f}s")
             break
         
-        # Tạo con
-        while len(population) < 2 * config.POPULATION_SIZE:
+        # Tạo con (có giới hạn số lần thử để tránh vòng lặp vô hạn ở test nhỏ)
+        target_size = 2 * config.POPULATION_SIZE
+        attempt = 0
+        max_attempt = max(50, config.POPULATION_SIZE)
+        while len(population) < target_size and attempt < max_attempt:
+            attempt += 1
             parent1, parent2 = select_parents(population)
-            if parent1 and parent2:
-                child = new_crossver2(parent1 , parent2 , Base_vehicleid_to_plan , PDG_map)
+            if not parent1 or not parent2:
+                break
+            child = new_crossver2(parent1 , parent2 , Base_vehicleid_to_plan , PDG_map)
+            if child is None:
+                continue
+            if config.USE_TABU:
+                sig_str = get_route_after(child.solution, {})
+                h_sig = hashlib.sha1(sig_str.encode('utf-8')).hexdigest()
+                if h_sig in global_tabu and not (config.TABU_ACCEPT_BETTER and child.fitness < best_solution.fitness):
+                    continue
+                global_tabu.append(h_sig)
+                if len(global_tabu) > config.TABU_LIST_SIZE:
+                    global_tabu.popleft()
             population.append(child)
-            
+
+        # Fallback: nếu không đủ số lượng (do tabu chặn hết), nhân bản elite
+        if len(population) < target_size:
+            population.sort(key=lambda x: x.fitness)
+            needed = target_size - len(population)
+            base = population[:max(1, min(len(population), 5))]
+            for k in range(needed):
+                population.append(copy.deepcopy(base[k % len(base)]))
+        
         if config.is_timeout():
             break
         
@@ -47,15 +76,25 @@ def GAVND_4(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
                 
         if population[0].fitness < best_solution.fitness: config.IMPROVED_IN_CROSS += 1
         
-        """ for c in range(len(population)):
-            if random.uniform(0 , 1) < config.MUTATION_RATE:
-                adaptive_LS_stategy(population[c] , True) """
-        
         population.sort(key=lambda x: x.fitness)
         for c in range( int(len(population) * config.MUTATION_RATE) ):
-            adaptive_LS_stategy(population[c] , True)
+            sig_str = get_route_after(population[c].solution , {})
+            h_sig = hashlib.sha1(sig_str.encode('utf-8')).hexdigest()
+            if population[c].cant_improved == False and h_sig not in cant_improved_list:
+                adaptive_LS_stategy(population[c] , True, mode=1, tabu_list=global_tabu, global_best=best_solution , global_population = population)
+            if population[c].cant_improved:
+                cant_improved_list.append(h_sig)
         
-        population.sort(key=lambda x: x.fitness)
+        """ population.sort(key=lambda x: x.fitness)
+        population = population[:config.POPULATION_SIZE]
+        if config.USE_TABU: 
+            for c in range(len(population)):
+                sig_str = get_route_after(population[c].solution , {})
+                h_sig = hashlib.sha1(sig_str.encode('utf-8')).hexdigest()
+                if h_sig not in global_tabu:
+                    global_tabu.append(h_sig)
+                    if len(global_tabu) > config.TABU_LIST_SIZE:
+                        global_tabu.popleft() """
         if population[0].fitness < best_solution.fitness: config.IMPROVED_IN_MUTATION += 1
         
         
@@ -66,14 +105,15 @@ def GAVND_4(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
         else:
             stagnant_generations += 1
         
+        avg = sum([c.fitness for c in population]) / len(population)
         
         print(f'Generation {gen+1}: Best = {best_solution.fitness:.2f}, '
             f'Worst = {population[-1].fitness:.2f}, '
-            f'Avg = {sum([c.fitness for c in population]) / len(population):.2f}, '
+            f'Avg = {avg:.2f}, '
             f'Time: {time.time() - begin_gen_time}')
 
         # Điều kiện dừng
-        if stagnant_generations >= 5:
+        if stagnant_generations >= 5 :
             print("Stopping early due to lack of improvement.")
             break
 
@@ -126,7 +166,7 @@ def select_parents(population: List[Chromosome]) -> Tuple[Chromosome, Chromosome
         return roulette_wheel_selection(), roulette_wheel_selection()
 
 
-def adaptive_LS_stategy(indivisual: Chromosome, is_limited=True , mode = 1):
+def adaptive_LS_stategy(indivisual: Chromosome, is_limited=True , mode = 1, tabu_list: deque | None = None, global_best: Chromosome | None = None , global_population : List[Chromosome] | None = None):
     if config.is_timeout():
         return False
     
@@ -154,27 +194,75 @@ def adaptive_LS_stategy(indivisual: Chromosome, is_limited=True , mode = 1):
         'mPDG': 0.0,
     }
     
+    # Pre-compute current route signature for tabu logic
+    from algorithm.engine import get_route_after
+    current_signature_str = get_route_after(indivisual.solution, {})
+    h_current_signature = hashlib.sha1(current_signature_str.encode('utf-8')).hexdigest()
+    if config.USE_TABU and tabu_list is not None and h_current_signature not in tabu_list:
+        tabu_list.append(h_current_signature)
+        if len(tabu_list) > config.TABU_LIST_SIZE:
+            tabu_list.popleft()
+
     while i < config.LS_MAX:
         if config.is_timeout():
             break
         
         ls_start = time.time()
         if methods[method_names[0]]():
-            ls_timings[method_names[0]] += time.time() - ls_start
-            i += 1
-            counters[method_names[0]] += 1
-            continue
-        ls_timings[method_names[0]] += time.time() - ls_start
+            """ tmp_chromosome = copy.deepcopy(indivisual)
+            tmp_chromosome.improved_LS_map =  {method: 0 for method in config.LS_METHODS}
+            global_population.append(tmp_chromosome) """
+            
+            if config.USE_TABU_IN_LS and tabu_list is not None:
+                signature_str = get_route_after(indivisual.solution, {})
+                h_signature = hashlib.sha1(signature_str.encode('utf-8')).hexdigest()
+                # Tabu check: skip if already seen and not improving global best
+                if h_signature in tabu_list and not (config.TABU_ACCEPT_BETTER and global_best and indivisual.fitness < global_best.fitness):
+                    # revert counting this improvement (treat as non-improving move)
+                    ls_timings[method_names[0]] += time.time() - ls_start
+                    # undo effect by not incrementing counters/i and continue to next method
+                else:
+                    tabu_list.append(h_signature)
+                    if len(tabu_list) > config.TABU_LIST_SIZE:
+                        tabu_list.popleft()
+                    ls_timings[method_names[0]] += time.time() - ls_start
+                    i += 1
+                    counters[method_names[0]] += 1
+                    continue
+            else:
+                ls_timings[method_names[0]] += time.time() - ls_start
+                i += 1
+                counters[method_names[0]] += 1
+                continue
         
         if config.is_timeout():
             break
         
         ls_start = time.time()
         if methods[method_names[1]]():
-            ls_timings[method_names[1]] += time.time() - ls_start
-            i += 1
-            counters[method_names[1]] += 1
-            continue
+            """ tmp_chromosome = copy.deepcopy(indivisual)
+            tmp_chromosome.improved_LS_map =  {method: 0 for method in config.LS_METHODS}
+            global_population.append(tmp_chromosome) """
+            
+            if config.USE_TABU_IN_LS and tabu_list is not None:
+                signature_str = get_route_after(indivisual.solution, {})
+                h_signature = hashlib.sha1(signature_str.encode('utf-8')).hexdigest()
+                if h_signature in tabu_list and not (config.TABU_ACCEPT_BETTER and global_best and indivisual.fitness < global_best.fitness):
+                    ls_timings[method_names[1]] += time.time() - ls_start
+                else:
+                    tabu_list.append(h_signature)
+                    if len(tabu_list) > config.TABU_LIST_SIZE:
+                        tabu_list.popleft()
+                    ls_timings[method_names[1]] += time.time() - ls_start
+                    i += 1
+                    counters[method_names[1]] += 1
+                    continue
+            else:
+                ls_timings[method_names[1]] += time.time() - ls_start
+                i += 1
+                counters[method_names[1]] += 1
+                continue
+
         ls_timings[method_names[1]] += time.time() - ls_start
         
         if config.is_timeout():
@@ -182,10 +270,29 @@ def adaptive_LS_stategy(indivisual: Chromosome, is_limited=True , mode = 1):
         
         ls_start = time.time()
         if methods[method_names[2]]():
-            ls_timings[method_names[2]] += time.time() - ls_start
-            i += 1
-            counters[method_names[2]] += 1
-            continue
+            if config.USE_TABU_IN_LS and tabu_list is not None:
+                """ tmp_chromosome = copy.deepcopy(indivisual)
+                tmp_chromosome.improved_LS_map =  {method: 0 for method in config.LS_METHODS}
+                global_population.append(tmp_chromosome) """
+                
+                signature_str = get_route_after(indivisual.solution, {})
+                h_signature = hashlib.sha1(signature_str.encode('utf-8')).hexdigest()
+                if h_signature in tabu_list and not (config.TABU_ACCEPT_BETTER and global_best and indivisual.fitness < global_best.fitness):
+                    ls_timings[method_names[2]] += time.time() - ls_start
+                else:
+                    tabu_list.append(h_signature)
+                    if len(tabu_list) > config.TABU_LIST_SIZE:
+                        tabu_list.popleft()
+                    ls_timings[method_names[2]] += time.time() - ls_start
+                    i += 1
+                    counters[method_names[2]] += 1
+                    continue
+            else:
+                ls_timings[method_names[2]] += time.time() - ls_start
+                i += 1
+                counters[method_names[2]] += 1
+                continue
+
         ls_timings[method_names[2]] += time.time() - ls_start
         
         if config.is_timeout():
@@ -193,15 +300,35 @@ def adaptive_LS_stategy(indivisual: Chromosome, is_limited=True , mode = 1):
         
         ls_start = time.time()
         if methods[method_names[3]]():
-            ls_timings[method_names[3]] += time.time() - ls_start
-            i += 1
-            counters[method_names[3]] += 1
-            continue
+            """ tmp_chromosome = copy.deepcopy(indivisual)
+            tmp_chromosome.improved_LS_map =  {method: 0 for method in config.LS_METHODS}
+            global_population.append(tmp_chromosome) """
+            
+            if config.USE_TABU_IN_LS and tabu_list is not None:
+                signature_str = get_route_after(indivisual.solution, {})
+                h_signature = hashlib.sha1(signature_str.encode('utf-8')).hexdigest()
+                if h_signature in tabu_list and not (config.TABU_ACCEPT_BETTER and global_best and indivisual.fitness < global_best.fitness):
+                    ls_timings[method_names[3]] += time.time() - ls_start
+                else:
+                    tabu_list.append(h_signature)
+                    if len(tabu_list) > config.TABU_LIST_SIZE:
+                        tabu_list.popleft()
+                    ls_timings[method_names[3]] += time.time() - ls_start
+                    i += 1
+                    counters[method_names[3]] += 1
+                    continue
+            else:
+                ls_timings[method_names[3]] += time.time() - ls_start
+                i += 1
+                counters[method_names[3]] += 1
+                continue
+
         ls_timings[method_names[3]] += time.time() - ls_start
         
         if config.is_timeout():
             break
         
+        indivisual.cant_improved = True
         break
 
     for method_name in methods.keys():
