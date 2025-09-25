@@ -11,7 +11,7 @@ from algorithm.Test_algorithm.new_engine import *
 from algorithm.Test_algorithm.new_LS import *
 
 
-def GAVND_4(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tuple, Tuple], 
+def GAVND_5(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tuple, Tuple], 
             id_to_vehicle: Dict[str, Vehicle], Unongoing_super_nodes: Dict[int, Dict[str, Node]], 
             Base_vehicleid_to_plan: Dict[str, List[Node]]) -> Chromosome:
     
@@ -41,37 +41,35 @@ def GAVND_4(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
         new_population = population[:elite_count]
         
         # Tạo con (có giới hạn số lần thử để tránh vòng lặp vô hạn ở test nhỏ)
-        target_size = 2*config.POPULATION_SIZE
+        target_size = config.POPULATION_SIZE
         while len(new_population) < target_size :
             parent1, parent2 = select_parents(population)
             distance = calculate_chromosome_distance(parent1, parent2)
             if not parent1 or not parent2 :
                 continue
-            child = new_crossver2(parent1 , parent2 , Base_vehicleid_to_plan , PDG_map)
+            child = new_crossver2(parent1 , parent2 , Base_vehicleid_to_plan , PDG_map )
+            #child = parent1.crossover(parent2 , PDG_map)
             if child is None:
                 continue
             new_population.append(child)
-
-        population = new_population[:config.POPULATION_SIZE]
+            
+        population : List[Chromosome] = new_population[:config.POPULATION_SIZE]
         
         if config.is_timeout():
             break
         
-        population.sort(key=lambda x: x.fitness)
+        population.sort(key= lambda x: x.fitness)
         population = population[:config.POPULATION_SIZE]
         if population[0].fitness < best_solution.fitness: config.IMPROVED_IN_CROSS += 1
         
-        population.sort(key=lambda x: x.fitness)
         mutate_count = 0
         for c in range (len(population)):
-            if mutate_count > int(len(population) * config.MUTATION_RATE):
+            if mutate_count > int(len(population) * 0.1):
                 break            
-            adaptive_LS_stategy(population[c] , True , 1)
+            randon_1_LS(population[c] , True , 1)
             mutate_count +=1
-
         
         population.sort(key=lambda x: x.fitness)
-
         if population[0].fitness < best_solution.fitness: config.IMPROVED_IN_MUTATION += 1
         
         
@@ -90,7 +88,8 @@ def GAVND_4(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
             f'Time: {time.time() - begin_gen_time}')
 
         # Điều kiện dừng
-        if stagnant_generations >= 5 or avg  == population[0].fitness:
+        #  
+        if stagnant_generations >= 5 or avg == population[0].fitness:
             print("Stopping early due to lack of improvement.")
             break
 
@@ -112,6 +111,19 @@ def GAVND_4(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
     final_time = time.time()
     total_runtime = final_time - config.BEGIN_TIME
     print(f"Total runtime: {total_runtime:.2f}s ({total_runtime/60:.1f} minutes)" )
+    # Giai doan 2
+    unique_population = remove_similar_individuals(population, threshold=0.0)
+    
+    mutate_count = 0
+    for c in range (len(unique_population)):
+        if mutate_count > int(len(population) * config.MUTATION_RATE) or mutate_count >= len(unique_population):
+            break            
+        adaptive_LS_stategy(unique_population[c] , True , 1)
+        mutate_count +=1
+    
+    unique_population.sort(key=lambda x: x.fitness)
+    best_solution = population[0]
+    
     return best_solution
 
 def select_parents(population: List[Chromosome]) -> Tuple[Chromosome, Chromosome]:
@@ -242,3 +254,4 @@ def adaptive_LS_stategy(indivisual: Chromosome, is_limited=True , mode = 1 ):
     total_ls_time = sum(ls_timings.values())
     timing_details = " | ".join([f"{name}:{counters[name]}({ls_timings[name]:.3f}s)" for name in method_names])
     print(f"LS: {timing_details} | TotalTime:{total_ls_time:.3f}s | Cost:{total_cost(indivisual.id_to_vehicle, indivisual.route_map, indivisual.solution):.2f}", file=sys.stderr)
+

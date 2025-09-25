@@ -219,7 +219,7 @@ def maintain_diversity(population: List[Chromosome],
     elite = population[:elite_size]
     
     # Loại bỏ các cá thể quá giống nhau
-    unique_population = remove_similar_individuals(elite, threshold=0.0)
+    unique_population = remove_similar_individuals(elite, threshold=0.0)    
     
     # Tạo cá thể mới để bù đắp
     new_individuals = []

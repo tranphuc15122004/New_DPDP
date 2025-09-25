@@ -599,8 +599,8 @@ def new_crossover(parent1: Chromosome , parent2: Chromosome , PDG_map : Dict[str
     child_solution_2.update(sorted_child_solution_2)
     child_2 = Chromosome(child_solution_2 , parent2.route_map , parent2.id_to_vehicle)
     
-    randon_1_LS(child_1 , is_limited , 0)
-    randon_1_LS(child_2 , is_limited , 0)
+    """ randon_1_LS(child_1 , is_limited , 0)
+    randon_1_LS(child_2 , is_limited , 0) """
     
     # Kiem tra lai và thêm các node còn thiếu solution 1        
     for key, value in check_valid_1.items():
@@ -876,38 +876,119 @@ def block_scoring_func(blockmap: Dict[str, List[Node]],
 
     return block_scores
 
-def cheapest_insertion_for_block(node_block: List[Node] , id_to_vehicle: Dict[str , Vehicle] , vehicleid_to_plan: Dict[str, list[Node]], route_map: Dict[tuple , tuple] , selected_vehicle: str= None):
-    temp_vehicleid_to_plan : Dict[str , List[Node]] = copy.deepcopy(vehicleid_to_plan)
-    minCostDelta = math.inf 
+# Incremental scoring with cache to avoid recomputing unchanged blocks each iteration
+def compute_block_scores_incremental(blockmap: Optional[Dict[str, List[Node]]],
+                                     route_map: Dict[Tuple[str, str], Tuple[float, float]],
+                                     score_cache: Dict[str, Tuple[float, float, float]]) -> Dict[str, Tuple[float, float, float]]:
+    """Compute block scores using a cache.
+
+    - blockmap: key -> node_list
+    - route_map: distance/time matrix
+    - score_cache: persisted across iterations, stores key -> (avg_distance, avg_time, avg_demand)
+
+    Returns a dict of scores for keys present in blockmap. For any key not in cache, compute and store it.
+    This mirrors block_scoring_func per-block logic but avoids recomputing existing keys.
+    """
+    if not blockmap:
+        return {}
+
+    result: Dict[str, Tuple[float, float, float]] = {}
+
+    for block_key, node_list in blockmap.items():
+        if block_key in score_cache:
+            result[block_key] = score_cache[block_key]
+            continue
+
+        # Compute score for this block (same logic as block_scoring_func for a single block)
+        if not node_list or len(node_list) % 2 != 0 or len(node_list) < 2:
+            score_cache[block_key] = (math.inf, math.inf, math.inf)
+            result[block_key] = score_cache[block_key]
+            continue
+
+        total_distance = 0.0
+        total_time = 0.0
+        edge_count = 0
+        total_demand = 0.0
+        item_count = 0
+
+        for nd in node_list:
+            if nd.pickup_item_list:
+                for it in nd.pickup_item_list:
+                    if hasattr(it, 'demand'):
+                        total_demand += it.demand
+                        item_count += 1
+            if nd.delivery_item_list:
+                for it in nd.delivery_item_list:
+                    if hasattr(it, 'demand'):
+                        total_demand += it.demand
+                        item_count += 1
+        avg_demand = (total_demand / item_count) if item_count > 0 else 0.0
+
+        for i in range(len(node_list) - 1):
+            n1 = node_list[i]
+            n2 = node_list[i + 1]
+            if not n1 or not n2:
+                continue
+            key = (n1.id, n2.id)
+            dis_time = route_map.get(key)
+            if dis_time is None:
+                dis_time = route_map.get((n2.id, n1.id))
+            if dis_time is None:
+                continue
+            try:
+                distance_val = float(dis_time[0])
+                time_val = float(dis_time[1])
+            except (ValueError, TypeError, IndexError):
+                continue
+            total_distance += distance_val
+            total_time += time_val
+            edge_count += 1
+
+        if edge_count == 0:
+            avg_distance = 0.0
+            avg_time = 0.0
+        else:
+            avg_distance = total_distance / edge_count
+            avg_time = total_time / edge_count
+
+        score = (avg_distance, avg_time, avg_demand)
+        score_cache[block_key] = score
+        result[block_key] = score
+
+    return result
+
+def cheapest_insertion_for_block(node_block: List[Node],
+                                id_to_vehicle: Dict[str, Vehicle],
+                                vehicleid_to_plan: Dict[str, list[Node]],
+                                route_map: Dict[tuple, tuple],
+                                selected_vehicle: str = None):
+    """Append-at-end heuristic with cost evaluation, optimized to avoid deep copies.
+
+    We override only the target vehicle's route in the shared mapping temporarily when
+    calling cost_of_a_route, then restore it. This avoids copying the whole plan map.
+    """
+    minCost = math.inf
     bestInsertPos = 0
-    bestInsertVehicleID : str  = None
-    
-    for vehicleID , vehicle in id_to_vehicle.items():
+    bestInsertVehicleID: Optional[str] = None
+
+    for vehicleID, vehicle in id_to_vehicle.items():
         if selected_vehicle is not None and vehicleID != selected_vehicle:
             continue
-        
-        vehicle_plan = vehicleid_to_plan[vehicleID]
-        
-        node_list_size = len(vehicle_plan) if vehicle_plan else 0
 
-        insert_pos = 1 if vehicle.des else 0
+        vehicle_plan = vehicleid_to_plan.get(vehicleID) or []
+        tempRouteNodeList = vehicle_plan + node_block  # append at end
+        carrying_items = vehicle.carrying_items if vehicle.des else []
+        if not isFeasible(tempRouteNodeList, carrying_items, vehicle.board_capacity):
+            continue
+        # Temporarily override this vehicle's route
+        tmp_cost = cost_of_a_route(tempRouteNodeList, vehicle, id_to_vehicle, route_map, vehicleid_to_plan)
         
-        for i in range(insert_pos , node_list_size  +1):
-            tempRouteNodeList = copy.deepcopy(vehicle_plan) if vehicle_plan else []
-            
-            tempRouteNodeList[i: i] = node_block
-            
-            carrying_items = vehicle.carrying_items if vehicle.des else []
-            if isFeasible(tempRouteNodeList , carrying_items , vehicle.board_capacity):
-                tmp_cost = cost_of_a_route(tempRouteNodeList , vehicle , id_to_vehicle , route_map , temp_vehicleid_to_plan)
-                if tmp_cost < minCostDelta:
-                    minCostDelta = tmp_cost
-                    bestInsertPos = i
-                    bestInsertVehicleID = vehicleID
-            
-            del tempRouteNodeList[i: i+ len(node_block)]
+        if tmp_cost < minCost:
+            minCost = tmp_cost
+            bestInsertPos = len(vehicle_plan)
+            bestInsertVehicleID = vehicleID
 
-    return bestInsertPos , bestInsertVehicleID
+    return bestInsertPos, bestInsertVehicleID
 
 # ================== Block map update with overlap removal & optional salvage (LIFO assumption) ==================
 # Thay vì lưu toàn bộ item id, chỉ lưu chữ ký nhóm pickup-delivery: "{count}_{anchor_item_id}"
@@ -1169,7 +1250,142 @@ def update_blockmap_drop_overlap(blockmap1: Dict[str, List[Node]],
     purge(blockmap1)
     purge(blockmap2)
 
-def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_plan : Dict[str , List[Node]] , PDG_map: Dict[str , List[Node]] ):
+
+
+# ================= Helper functions for validation ==================
+def pickup_signature_of(nd: Node) -> Optional[str]:
+    if nd and nd.pickup_item_list:
+        return f"{len(nd.pickup_item_list)}_{nd.pickup_item_list[0].id}"
+    return None
+
+def delivery_signature_of(nd: Node) -> Optional[str]:
+    if nd and nd.delivery_item_list:
+        return f"{len(nd.delivery_item_list)}_{nd.delivery_item_list[-1].id}"
+    return None
+
+def extract_pickup_signatures(nodes: List[Node]) -> set[str]:
+    sigs = set()
+    for nd in nodes:
+        ps = pickup_signature_of(nd)
+        if ps:
+            sigs.add(ps)
+    return sigs
+
+def route_is_lifo_valid(route: List[Node]) -> bool:
+    stack: List[str] = []
+    seen_pickups: set[str] = set()
+    for nd in route:
+        ps = pickup_signature_of(nd)
+        if ps:
+            if ps in seen_pickups:
+                return False
+            stack.append(ps)
+            seen_pickups.add(ps)
+        ds = delivery_signature_of(nd)
+        if ds:
+            if not stack or stack[-1] != ds:
+                return False
+            stack.pop()
+    return len(stack) == 0
+
+def build_block_vehicle_map(blockmap: Dict[str, List[Node]], node2veh: Dict[int, str]) -> Dict[str, Optional[str]]:
+    res: Dict[str, Optional[str]] = {}
+    for k, nodes in (blockmap or {}).items():
+        vid: Optional[str] = None
+        # Pick the first node that matches a vehicle; blocks should be contiguous from one route
+        for nd in (nodes or []):
+            vid = node2veh.get(id(nd))
+            if vid is not None:
+                break
+        res[k] = vid
+    return res
+
+# Map each node (by identity) to its vehicle in each parent, then map blocks -> source vehicle
+def build_node_to_vehicle(solution: Dict[str, List[Node]]) -> Dict[int, str]:
+    m: Dict[int, str] = {}
+    for vid, route in (solution or {}).items():
+        if not route:
+            continue
+        for nd in route:
+            m[id(nd)] = vid
+    return m
+
+# Hàm tính chữ ký block
+def block_signatures(nodes: List[Node]) -> set[str]:
+    sigs: set[str] = set()
+    for nd in nodes:
+        if nd.pickup_item_list:
+            sigs.add(f"{len(nd.pickup_item_list)}_{nd.pickup_item_list[0].id}")
+        if nd.delivery_item_list:
+            sigs.add(f"{len(nd.delivery_item_list)}_{nd.delivery_item_list[-1].id}")
+    return sigs
+            
+
+PREFILTER_K = 200
+
+def find_best_block(blockmap1: Dict[str, List[Node]],
+                    blockmap2: Dict[str, List[Node]],
+                    blockscore1: Dict[str, Tuple[float, float, float]],
+                    blockscore2: Dict[str, Tuple[float, float, float]]):
+    """Chọn block tốt nhất với skyline O(B log B) thay vì O(B^2):
+    1) Hợp nhất ứng viên từ cả hai parent: (key, nodes, avg_dis, avg_time, avg_demand).
+    2) Lọc non-dominated bằng thuật toán skyline 2D (dis, time): sort theo dis tăng dần, giữ các điểm có time < best_time_so_far.
+    3) Trong front, ưu tiên demand lớn (giữ hiệu quả) rồi tie-break bằng (dis+time) nhỏ.
+    """
+    candidates = []  # (key, nodes, avg_dis, avg_time, avg_demand)
+
+    # Gom ứng viên từ parent 1
+    for k, nodes in (blockmap1 or {}).items():
+        if not nodes:
+            continue
+        score = blockscore1.get(k)
+        if not score:
+            continue
+        avg_dis, avg_time, avg_demand = score
+        if math.isinf(avg_dis) or math.isinf(avg_time) or math.isinf(avg_demand):
+            continue
+        candidates.append((k, nodes, avg_dis, avg_time, avg_demand))
+    # Gom ứng viên từ parent 2
+    for k, nodes in (blockmap2 or {}).items():
+        if not nodes:
+            continue
+        score = blockscore2.get(k)
+        if not score:
+            continue
+        avg_dis, avg_time, avg_demand = score
+        if math.isinf(avg_dis) or math.isinf(avg_time) or math.isinf(avg_demand):
+            continue
+        candidates.append((k, nodes, avg_dis, avg_time, avg_demand))
+
+    if not candidates:
+        return None
+
+    # Prefilter top-K by demand desc then (dis+time) asc to reduce set size
+    if len(candidates) > PREFILTER_K:
+        candidates.sort(key=lambda x: (-x[4], (x[2] + x[3])))
+        candidates = candidates[:PREFILTER_K]
+
+    # Skyline: O(B log B)
+    candidates.sort(key=lambda x: (x[2], x[3]))  # sort by distance asc, time asc
+    front = []
+    best_time = math.inf
+    for item in candidates:
+        _, _, dis, tim, _ = item
+        # Since sorted by (dis asc, time asc), any item with time < best_time is non-dominated
+        if tim < best_time:
+            front.append(item)
+            best_time = tim
+
+    if not front:
+        return None
+
+    # Ưu tiên demand lớn, tie-break theo (dis+time) nhỏ
+    front.sort(key=lambda x: (-x[4], (x[2] + x[3])))
+    best = front[0]
+    return best[1]
+
+def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_plan : Dict[str , List[Node]] , PDG_map: Dict[str , List[Node]] , static_single_pass: bool = False):
+    start_cross_time = time.time()
     
     # Cac super node
     new_PDG_map : Dict[str , List[Node]] = {}
@@ -1181,8 +1397,14 @@ def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_
     
     blockmap_parent1 = extract_block_from_solution(parent1.solution , parent1.id_to_vehicle)
     blockmap_parent2 = extract_block_from_solution(parent2.solution , parent2.id_to_vehicle)
+    node2veh_p1 = build_node_to_vehicle(parent1.solution)
+    node2veh_p2 = build_node_to_vehicle(parent2.solution)
+    
+    block_vehicle_map_p1: Dict[str, Optional[str]] = build_block_vehicle_map(blockmap_parent1, node2veh_p1)
+    block_vehicle_map_p2: Dict[str, Optional[str]] = build_block_vehicle_map(blockmap_parent2, node2veh_p2)
 
     # ========= Khởi tạo biến điều khiển vòng lặp =========
+    DEBUG = False  # set True to enable verbose logging
     start_time = time.time()
     iteration = 0
     stagnation = 0  # số vòng không thu thêm signature mới
@@ -1236,146 +1458,155 @@ def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_
             return True
         return False
     
-    def find_best_block(blockmap1: Dict[str, List[Node]],
-                        blockmap2: Dict[str, List[Node]],
-                        blockscore1: Dict[str, Tuple[float, float, float]],
-                        blockscore2: Dict[str, Tuple[float, float, float]]):
-        """Chọn block tốt nhất theo 2 bước:
-        1. Hợp nhất các block từ 2 parent và thực hiện non-dominated sorting trên 2 mục tiêu (avg_distance, avg_time) => Front 0.
-        2. Trong Front 0 chọn block có average demand lớn nhất (tie-break: nhỏ nhất (avg_distance + avg_time)).
-        Trả về danh sách Node của block tốt nhất hoặc None nếu không có.
-        """
-        candidates = []  # (key, nodes, avg_dis, avg_time, avg_demand)
-
-        # Gom ứng viên từ parent 1
-        for k, nodes in (blockmap1 or {}).items():
-            if not nodes:
-                continue
-            score = blockscore1.get(k)
-            if score is None:
-                continue
-            avg_dis, avg_time, avg_demand = score
-            if math.isinf(avg_dis) or math.isinf(avg_time) or math.isinf(avg_demand):
-                continue
-            candidates.append((k, nodes, avg_dis, avg_time, avg_demand))
-        # Gom ứng viên từ parent 2
-        for k, nodes in (blockmap2 or {}).items():
-            if not nodes:
-                continue
-            score = blockscore2.get(k)
-            if score is None:
-                continue
-            avg_dis, avg_time, avg_demand = score
-            if math.isinf(avg_dis) or math.isinf(avg_time) or math.isinf(avg_demand):
-                continue
-            candidates.append((k, nodes, avg_dis, avg_time, avg_demand))
-
-        if not candidates:
-            return None
-
-        # Non-dominated filtering (Front 0)
-        front = []
-        for i, ci in enumerate(candidates):
-            _, _, dis_i, time_i, _ = ci
-            dominated = False
-            for j, cj in enumerate(candidates):
-                if i == j:
-                    continue
-                _, _, dis_j, time_j, _ = cj
-                if (dis_j <= dis_i and time_j <= time_i) and (dis_j < dis_i or time_j < time_i):
-                    dominated = True
-                    break
-            if not dominated:
-                front.append(ci)
-
-        if not front:
-            return None
-
-        front.sort(key=lambda x: (x[4], (x[2] + x[3])))
-        best = front[0]
-        return best[1]
     
     used_signatures : set[str] = set()
 
     child_vehicleid_to_plan : Dict[str , List[Node]] = copy.deepcopy(Base_vehicleid_to_plan)
 
-    # ================= Helper functions for validation ==================
-    def pickup_signature_of(nd: Node) -> Optional[str]:
-        if nd and nd.pickup_item_list:
-            return f"{len(nd.pickup_item_list)}_{nd.pickup_item_list[0].id}"
-        return None
-
-    def delivery_signature_of(nd: Node) -> Optional[str]:
-        if nd and nd.delivery_item_list:
-            return f"{len(nd.delivery_item_list)}_{nd.delivery_item_list[-1].id}"
-        return None
-
-    def extract_pickup_signatures(nodes: List[Node]) -> set[str]:
-        sigs = set()
-        for nd in nodes:
-            ps = pickup_signature_of(nd)
-            if ps:
-                sigs.add(ps)
-        return sigs
-
-    def route_is_lifo_valid(route: List[Node]) -> bool:
-        stack: List[str] = []
-        seen_pickups: set[str] = set()
-        for nd in route:
-            ps = pickup_signature_of(nd)
-            if ps:
-                # duplicate pickup signature => invalid (should appear only once as pickup)
-                if ps in seen_pickups:
-                    return False
-                stack.append(ps)
-                seen_pickups.add(ps)
-            ds = delivery_signature_of(nd)
-            if ds:
-                if not stack or stack[-1] != ds:
-                    return False
-                stack.pop()
-        return len(stack) == 0
-
-    def solution_is_valid(solution: Dict[str, List[Node]]) -> bool:
-        for v_route in solution.values():
-            if not route_is_lifo_valid(v_route):
-                return False
-        return True
-
     # Seed used_signatures from any existing nodes in base plan (avoid re-adding groups already present)
     for v_nodes in child_vehicleid_to_plan.values():
         used_signatures.update(extract_pickup_signatures(v_nodes))
-    if used_signatures:
+    if DEBUG and used_signatures:
         print(f"[new_crossver2] Seeded {len(used_signatures)} signatures from base plan", file=sys.stderr)
     
     prev_block = None
-    print(f"[new_crossver2] START | total_target_blocks={len(new_PDG_map)}", file=sys.stderr)
-    while True:
+    if DEBUG:
+        print(f"[new_crossver2] START | total_target_blocks={len(new_PDG_map)}", file=sys.stderr)
+
+    # Optional FAST PATH: compute scores once and insert in a single ordered pass
+    if static_single_pass:
+        # 1) Compute scores once
+        score_map_p1 = block_scoring_func(blockmap_parent1, parent1.solution, parent2.solution, parent1.route_map)
+        score_map_p2 = block_scoring_func(blockmap_parent2, parent1.solution, parent2.solution, parent1.route_map)
+
+        # 2) Build candidate list
+        candidates = []  # (origin, key, nodes, dis, time, demand)
+        if blockmap_parent1:
+            for k, nodes in blockmap_parent1.items():
+                sc = score_map_p1.get(k)
+                if not sc:
+                    continue
+                d, t, dem = sc
+                if math.isinf(d) or math.isinf(t) or math.isinf(dem):
+                    continue
+                candidates.append(("P1", k, nodes, d, t, dem))
+        if blockmap_parent2:
+            for k, nodes in blockmap_parent2.items():
+                sc = score_map_p2.get(k)
+                if not sc:
+                    continue
+                d, t, dem = sc
+                if math.isinf(d) or math.isinf(t) or math.isinf(dem):
+                    continue
+                candidates.append(("P2", k, nodes, d, t, dem))
+
+        # Prefilter by demand desc then (d+t) asc to shrink candidate set
+        if len(candidates) > PREFILTER_K:
+            candidates.sort(key=lambda x: (-x[5], (x[3] + x[4])))
+            candidates = candidates[:PREFILTER_K]
+
+        # 3) Compute skyline front once
+        def skyline_front(items):
+            items_sorted = sorted(items, key=lambda x: (x[3], x[4]))  # by (distance, time)
+            best_time = math.inf
+            # Use (origin,key) as identity to avoid unhashable list in tuple
+            front_identities = set()
+            for it in items_sorted:
+                if it[4] < best_time:
+                    best_time = it[4]
+                    front_identities.add((it[0], it[1]))  # (origin, key)
+            return front_identities
+
+        front_set = skyline_front(candidates)
+        # 4) Static ranking: prefer skyline members, then demand desc, then (d+t)
+        candidates.sort(key=lambda x: (0 if (x[0], x[1]) in front_set else 1, -x[5], (x[3] + x[4])))
+
+        # 5) Single pass insertion
+        for origin, key, nodes, d, t, dem in candidates:
+            # If already fully covered all PD groups, stop
+            if total_blocks_target > 0 and len(used_signatures) >= total_blocks_target:
+                break
+
+            # Skip if any of its pickup signatures already used
+            def block_pickup_sigs(ns: List[Node]) -> set[str]:
+                s = set()
+                for nd in ns:
+                    if nd.pickup_item_list:
+                        s.add(f"{len(nd.pickup_item_list)}_{nd.pickup_item_list[0].id}")
+                return s
+            pick_sigs = block_pickup_sigs(nodes)
+            if any(sig in used_signatures for sig in pick_sigs):
+                continue
+
+            # Determine target vehicle if respecting source vehicle
+            selected_vehicle: Optional[str] = None
+            if respect_source_vehicle:
+                if origin == "P1":
+                    selected_vehicle = block_vehicle_map_p1.get(key)
+                else:
+                    selected_vehicle = block_vehicle_map_p2.get(key)
+                # If the mapped vehicle doesn't exist in child plan, null it to skip/fallback
+                if selected_vehicle not in child_vehicleid_to_plan:
+                    selected_vehicle = None
+
+            # Try insertion at best position (append-based CI currently)
+            bestInsertPos, bestInsertVehicle = cheapest_insertion_for_block(
+                nodes,
+                parent1.id_to_vehicle,
+                child_vehicleid_to_plan,
+                parent1.route_map,
+                selected_vehicle=selected_vehicle if respect_source_vehicle else None,
+            )
+            if bestInsertVehicle is None:
+                # Strict mode: if enforcing source vehicle and no feasible insertion, skip this block
+                continue
+            target_route = child_vehicleid_to_plan[bestInsertVehicle]
+            target_route[bestInsertPos: bestInsertPos] = nodes
+            if not route_is_lifo_valid(target_route):
+                # rollback
+                del target_route[bestInsertPos: bestInsertPos + len(nodes)]
+                continue
+
+            # Update signatures and drop overlaps in blockmaps (no salvage)
+            used_signatures.update(pick_sigs)
+            update_blockmap_drop_overlap(blockmap_parent1, blockmap_parent2, nodes, used_signatures)
+
+    # Caches for block scores to avoid recomputation across iterations (dynamic mode)
+    score_cache_p1: Dict[str, Tuple[float, float, float]] = {}
+    score_cache_p2: Dict[str, Tuple[float, float, float]] = {}
+    
+    begin1  =time.time()
+    
+    while not static_single_pass:
         if is_finished():
-            print(f"[new_crossver2] STOP before-iter reason={last_stop_reason} iter={iteration}", file=sys.stderr)
+            if DEBUG:
+                print(f"[new_crossver2] STOP before-iter reason={last_stop_reason} iter={iteration}", file=sys.stderr)
             break
         try:
             # Log trạng thái đầu vòng lặp (coverage hiện tại trước khi chọn block mới)
-            print(
-                f"[new_crossver2] Iter {iteration} | blocks_p1={len(blockmap_parent1) if blockmap_parent1 else 0} | "
-                f"blocks_p2={len(blockmap_parent2) if blockmap_parent2 else 0} | used_sig={len(used_signatures)}/{total_blocks_target} | "
-                f"stagn={stagnation}",
-                file=sys.stderr
-            )
+            if DEBUG:
+                print(
+                    f"[new_crossver2] Iter {iteration} | blocks_p1={len(blockmap_parent1) if blockmap_parent1 else 0} | "
+                    f"blocks_p2={len(blockmap_parent2) if blockmap_parent2 else 0} | used_sig={len(used_signatures)}/{total_blocks_target} | "
+                    f"stagn={stagnation}",
+                    file=sys.stderr
+                )
 
             # Cập nhật block map với block trước đó
             update_blockmap(blockmap_parent1, blockmap_parent2, prev_block, used_signatures)
-
+            
             # Điểm các block
-            block_score_parent1 = block_scoring_func(blockmap_parent1, parent1.solution, parent2.solution, parent1.route_map)
-            block_score_parent2 = block_scoring_func(blockmap_parent2, parent1.solution, parent2.solution, parent1.route_map)
+            block_score_parent1 = compute_block_scores_incremental(blockmap_parent1, parent1.route_map, score_cache_p1)
+            block_score_parent2 = compute_block_scores_incremental(blockmap_parent2, parent1.route_map, score_cache_p2)
             candidate_count = (len(block_score_parent1) if block_score_parent1 else 0) + (len(block_score_parent2) if block_score_parent2 else 0)
-            print(f"[new_crossver2] Iter {iteration} | candidate_blocks={candidate_count}", file=sys.stderr)
+            if DEBUG:
+                print(f"[new_crossver2] Iter {iteration} | candidate_blocks={candidate_count}", file=sys.stderr)
 
             best_block = find_best_block(blockmap_parent1, blockmap_parent2, block_score_parent1, block_score_parent2)
             if not best_block:
                 last_stop_reason = 'no-candidate'
-                print(f"[new_crossver2] Iter {iteration} | no candidates -> stopping", file=sys.stderr)
+                if DEBUG:
+                    print(f"[new_crossver2] Iter {iteration} | no candidates -> stopping", file=sys.stderr)
                 break
 
             # Lấy key block (nếu xác định được) để log
@@ -1389,17 +1620,7 @@ def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_
                     if v is best_block:
                         found_key = f"P2:{k}"
                         break
-
-            # Hàm tính chữ ký block
-            def block_signatures(nodes: List[Node]) -> set[str]:
-                sigs: set[str] = set()
-                for nd in nodes:
-                    if nd.pickup_item_list:
-                        sigs.add(f"{len(nd.pickup_item_list)}_{nd.pickup_item_list[0].id}")
-                    if nd.delivery_item_list:
-                        sigs.add(f"{len(nd.delivery_item_list)}_{nd.delivery_item_list[-1].id}")
-                return sigs
-
+            
             new_sigs = block_signatures(best_block)
             # Skip block if any of its pickup signatures already used (to avoid duplicates & LIFO conflicts)
             pickup_sigs = {s for s in new_sigs if '_' in s}  # all are pickup style already
@@ -1418,26 +1639,36 @@ def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_
                             blockmap_parent2.pop(k, None)
                             removed_from = 'P2'
                             break
-                print(f"[new_crossver2] Iter {iteration} | skip duplicate-signature block {found_key}", file=sys.stderr)
+                if DEBUG:
+                    print(f"[new_crossver2] Iter {iteration} | skip duplicate-signature block {found_key}", file=sys.stderr)
                 stagnation += 1
                 continue
 
             gain = len(pickup_sigs - used_signatures)
-            print(
-                f"[new_crossver2] Iter {iteration} | chosen_block_key={found_key} | block_len={len(best_block)} | "
-                f"new_pick_sig_gain={gain}",
-                file=sys.stderr
-            )
+            if DEBUG:
+                print(
+                    f"[new_crossver2] Iter {iteration} | chosen_block_key={found_key} | block_len={len(best_block)} | "
+                    f"new_pick_sig_gain={gain}",
+                    file=sys.stderr
+                )
             if gain < MIN_GAIN_PER_BLOCK:
                 stagnation += 1
             else:
                 stagnation = 0
 
             # Perform tentative insertion
-            bestInsertPos, bestInsertVehicle = cheapest_insertion_for_block(best_block, parent1.id_to_vehicle, child_vehicleid_to_plan, parent1.route_map)
+            
+
+            bestInsertPos, bestInsertVehicle = cheapest_insertion_for_block(
+                best_block,
+                parent1.id_to_vehicle,
+                child_vehicleid_to_plan,
+                parent1.route_map
+            )
             if bestInsertVehicle is None:
                 last_stop_reason = 'no-insertion-position'
-                print(f"[new_crossver2] Iter {iteration} | insertion failed -> stopping", file=sys.stderr)
+                if DEBUG:
+                    print(f"[new_crossver2] Iter {iteration} | insertion failed -> stopping", file=sys.stderr)
                 break
             target_route = child_vehicleid_to_plan[bestInsertVehicle]
             target_route[bestInsertPos: bestInsertPos] = best_block
@@ -1458,31 +1689,40 @@ def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_
                     for k, v in list(blockmap_parent2.items()):
                         if v is best_block:
                             blockmap_parent2.pop(k, None)
-                print(f"[new_crossver2] Iter {iteration} | rollback block {found_key} (violates LIFO/dup)", file=sys.stderr)
+                if DEBUG:
+                    print(f"[new_crossver2] Iter {iteration} | rollback block {found_key} (violates LIFO/dup)", file=sys.stderr)
                 stagnation += 1
                 continue
 
             # Update coverage after successful insertion
             used_signatures.update(pickup_sigs)
-            print(
-                f"[new_crossver2] Iter {iteration} | inserted at vehicle={bestInsertVehicle} pos={bestInsertPos} | "
-                f"coverage={len(used_signatures)}/{total_blocks_target}",
-                file=sys.stderr
-            )
+            if DEBUG:
+                print(
+                    f"[new_crossver2] Iter {iteration} | inserted at vehicle={bestInsertVehicle} pos={bestInsertPos} | "
+                    f"coverage={len(used_signatures)}/{total_blocks_target}",
+                    file=sys.stderr
+                )
 
             prev_block = best_block
             iteration += 1
         except Exception as e:
             last_stop_reason = 'exception'
-            print(f"[new_crossver2] Iter {iteration} | EXCEPTION: {e}", file=sys.stderr)
+            if DEBUG:
+                print(f"[new_crossver2] Iter {iteration} | EXCEPTION: {e}", file=sys.stderr)
             import traceback
-            traceback.print_exc(file=sys.stderr)
+            if DEBUG:
+                traceback.print_exc(file=sys.stderr)
             break
-    print(
-        f"[new_crossver2] END | iterations={iteration} | coverage={len(used_signatures)}/{total_blocks_target} | "
-        f"used_signatures={len(used_signatures)} | final_reason={last_stop_reason}",
-        file=sys.stderr
-    )
+    
+    end1 = time.time()
+    
+    if DEBUG:
+        print(
+            f"[new_crossver2] END | iterations={iteration} | coverage={len(used_signatures)}/{total_blocks_target} | "
+            f"used_signatures={len(used_signatures)} | final_reason={last_stop_reason}",
+            file=sys.stderr
+        )
+    
     
     # kiểm tra lại lời giải con và xử lý các node thừa hoặc thiếu
     for vehicleID in parent1.id_to_vehicle.keys():
@@ -1519,33 +1759,22 @@ def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_
         if value == 0:
             if random.uniform(0 , 1) < 1:
                 # truong hop bi thieu 1 super node thi gan theo chien luoc CI vao solution hien tai
-                selected_vehicleID = random.choice(list(parent1.id_to_vehicle.keys()))
                 node_list = new_PDG_map[key]
-                isExhausive = False
-                route_node_list : List[Node] = []
                 
                 if node_list:
-                    # Sửa tham chiếu: dùng child_vehicleid_to_plan thay vì biến không tồn tại child_solution_1
-                    isExhausive , bestInsertVehicleID, bestInsertPosI, bestInsertPosJ , bestNodeList = new_dispatch_nodePair(
-                        node_list , parent1.id_to_vehicle , child_vehicleid_to_plan , parent1.route_map ,selected_vehicleID
-                    )
+                    bestInsertPos, bestInsertVehicle = cheapest_insertion_for_block(node_list, parent1.id_to_vehicle, child_vehicleid_to_plan, parent1.route_map)
                     
-                route_node_list = child_vehicleid_to_plan.get(bestInsertVehicleID , [])
-                if isExhausive:
-                    route_node_list = bestNodeList[:]
-                else:
-                    if route_node_list is None:
-                        route_node_list = []
-                    
-                    new_order_pickup_node = node_list[0]
-                    new_order_delivery_node = node_list[1]
-                    
-                    route_node_list.insert(bestInsertPosI, new_order_pickup_node)
-                    route_node_list.insert(bestInsertPosJ, new_order_delivery_node)
-                child_vehicleid_to_plan[bestInsertVehicleID] = route_node_list
+                if bestInsertVehicle is None:
+                    last_stop_reason = 'no-insertion-position'
+                    print(f"[new_crossver2] reinsert abandon block | insertion failed -> stopping", file=sys.stderr)
+                    break
+                target_route = child_vehicleid_to_plan[bestInsertVehicle]
+                target_route[bestInsertPos: bestInsertPos] = node_list
+                
             else:
                 node_list = new_PDG_map[key]
                 random_dispatch_nodePair(node_list, parent1.id_to_vehicle, child_vehicleid_to_plan)
     
+    #print((end1 - begin1) / (time.time() - start_cross_time) *  100)
     
     return Chromosome(child_vehicleid_to_plan , parent1.route_map , parent1.id_to_vehicle)
