@@ -45,7 +45,7 @@ def new_dispatch_new_orders(vehicleid_to_plan: Dict[str , list[Node]] ,  id_to_f
                             if len(plan) >= 6: all_exhautive = False
                         
                         
-                        node_list: list[Node] = create_Pickup_Delivery_nodes(copy.deepcopy(tmp_itemList) , id_to_factory)
+                        node_list: list[Node] = create_Pickup_Delivery_nodes(tmp_itemList , id_to_factory)
                         isExhausive = False
                         route_node_list : List[Node] = []
                         
@@ -77,7 +77,7 @@ def new_dispatch_new_orders(vehicleid_to_plan: Dict[str , list[Node]] ,  id_to_f
                     for plan in vehicleid_to_plan.values():
                         if len(plan) >= 6: all_exhautive = False
                     
-                    node_list: list[Node] = create_Pickup_Delivery_nodes(copy.deepcopy(tmp_itemList) , id_to_factory)
+                    node_list: list[Node] = create_Pickup_Delivery_nodes(tmp_itemList , id_to_factory)
                     isExhausive = False
                     
                     if node_list:
@@ -102,7 +102,7 @@ def new_dispatch_new_orders(vehicleid_to_plan: Dict[str , list[Node]] ,  id_to_f
                 for plan in vehicleid_to_plan.values():
                     if len(plan) >= 6: all_exhautive = False
                 
-                node_list: list[Node] = create_Pickup_Delivery_nodes(copy.deepcopy(orderID_items) , id_to_factory)
+                node_list: list[Node] = create_Pickup_Delivery_nodes(orderID_items , id_to_factory)
                 
                 isExhausive = False
                 if node_list:
@@ -395,7 +395,7 @@ def remove_similar_individuals(population: List[Chromosome], threshold: float = 
                 break
         
         if is_unique:
-            unique_population.append(copy.deepcopy(individual))
+            unique_population.append(individual)
     
     return unique_population
 
@@ -713,7 +713,9 @@ def new_dispatch_nodePair(node_list: list[Node]  , id_to_vehicle: Dict[str , Veh
         
         for i in range(insert_pos, node_list_size + 1):
             if vehicle_plan is not None:
-                tempRouteNodeList = copy.deepcopy(vehicle_plan)
+                #tempRouteNodeList = copy.deepcopy(vehicle_plan)
+                tempRouteNodeList : List[Node] = []
+                for nnn in vehicle_plan: tempRouteNodeList.append(nnn)
             else:
                 tempRouteNodeList = []
 
@@ -1321,7 +1323,7 @@ def block_signatures(nodes: List[Node]) -> set[str]:
     return sigs
             
 
-PREFILTER_K = 200
+PREFILTER_K = 1200
 
 def find_best_block(blockmap1: Dict[str, List[Node]],
                     blockmap2: Dict[str, List[Node]],
@@ -1385,7 +1387,6 @@ def find_best_block(blockmap1: Dict[str, List[Node]],
     return best[1]
 
 def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_plan : Dict[str , List[Node]] , PDG_map: Dict[str , List[Node]] , static_single_pass: bool = False):
-    start_cross_time = time.time()
     
     # Cac super node
     new_PDG_map : Dict[str , List[Node]] = {}
@@ -1575,7 +1576,6 @@ def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_
     score_cache_p1: Dict[str, Tuple[float, float, float]] = {}
     score_cache_p2: Dict[str, Tuple[float, float, float]] = {}
     
-    begin1  =time.time()
     
     while not static_single_pass:
         if is_finished():
@@ -1656,9 +1656,6 @@ def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_
             else:
                 stagnation = 0
 
-            # Perform tentative insertion
-            
-
             bestInsertPos, bestInsertVehicle = cheapest_insertion_for_block(
                 best_block,
                 parent1.id_to_vehicle,
@@ -1714,7 +1711,6 @@ def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_
                 traceback.print_exc(file=sys.stderr)
             break
     
-    end1 = time.time()
     
     if DEBUG:
         print(
@@ -1757,7 +1753,7 @@ def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_
     # Kiem tra lai và thêm các node còn thiếu vào con   
     for key, value in check_valid.items():
         if value == 0:
-            if random.uniform(0 , 1) < 1:
+            if random.uniform(0 , 1) <1:
                 # truong hop bi thieu 1 super node thi gan theo chien luoc CI vao solution hien tai
                 node_list = new_PDG_map[key]
                 
@@ -1770,6 +1766,30 @@ def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_
                     break
                 target_route = child_vehicleid_to_plan[bestInsertVehicle]
                 target_route[bestInsertPos: bestInsertPos] = node_list
+                
+                """ selected_vehicleID = random.choice(list(parent1.id_to_vehicle.keys()))
+                
+                node_list = new_PDG_map[key]
+                isExhausive = False
+                route_node_list : List[Node] = []
+                
+                if node_list:
+                    isExhausive , bestInsertVehicleID, bestInsertPosI, bestInsertPosJ , bestNodeList = new_dispatch_nodePair(node_list , parent2.id_to_vehicle , child_vehicleid_to_plan , parent2.route_map  )
+                    
+                route_node_list = child_vehicleid_to_plan.get(bestInsertVehicleID , [])
+
+                if isExhausive:
+                    route_node_list = bestNodeList[:]
+                else:
+                    if route_node_list is None:
+                        route_node_list = []
+                    
+                    new_order_pickup_node = node_list[0]
+                    new_order_delivery_node = node_list[1]
+                    
+                    route_node_list.insert(bestInsertPosI, new_order_pickup_node)
+                    route_node_list.insert(bestInsertPosJ, new_order_delivery_node)
+                child_vehicleid_to_plan[bestInsertVehicleID] = route_node_list """
                 
             else:
                 node_list = new_PDG_map[key]
