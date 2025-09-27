@@ -26,7 +26,6 @@ def GAVND_5(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
     best_solution = population[0]
     # Elite size
     
-
     for gen in range(config.NUMBER_OF_GENERATION):
         # Kiểm tra timeout
         begin_gen_time = time.time()
@@ -44,11 +43,9 @@ def GAVND_5(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
         target_size = config.POPULATION_SIZE
         while len(new_population) < target_size :
             parent1, parent2 = select_parents(population)
-            distance = calculate_chromosome_distance(parent1, parent2)
             if not parent1 or not parent2 :
                 continue
             child = new_crossver2(parent1 , parent2 , Base_vehicleid_to_plan , PDG_map )
-            #child = parent1.crossover(parent2 , PDG_map)
             if child is None:
                 continue
             new_population.append(child)
@@ -107,10 +104,10 @@ def GAVND_5(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
         if elapsed_time  > config.ALGO_TIME_LIMIT:
             print(f"TimeOut!! Elapsed: {elapsed_time:.1f}s, Estimated next gen: {estimated_next_gen_time:.1f}s")
             break
-
     final_time = time.time()
     total_runtime = final_time - config.BEGIN_TIME
     print(f"Total runtime: {total_runtime:.2f}s ({total_runtime/60:.1f} minutes)" )
+    
     # Giai doan 2
     unique_population = remove_similar_individuals(population, threshold=0.0)
     
@@ -122,7 +119,8 @@ def GAVND_5(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
         mutate_count +=1
     
     unique_population.sort(key=lambda x: x.fitness)
-    best_solution = population[0]
+    if unique_population[0].fitness < best_solution.fitness: config.IMPROVED_IN_DIVER += 1
+    best_solution = unique_population[0]
     
     return best_solution
 
