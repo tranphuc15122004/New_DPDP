@@ -44,6 +44,7 @@ def main():
     if best_chromosome is None or best_chromosome.fitness > total_cost(id_to_vehicle , route_map , vehicleid_to_plan):
         best_chromosome = Chromosome(vehicleid_to_plan , route_map , id_to_vehicle)
     
+    
     print()
     print('The solution initialized by Cheapest Insertion:')
     print(get_route_after(vehicleid_to_plan , {}))

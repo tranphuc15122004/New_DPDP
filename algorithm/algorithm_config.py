@@ -38,6 +38,11 @@ IMPROVED_IN_MUTATION = 0
 IMPROVED_IN_DIVER = 0
 """Per local search time limit (seconds). Each LS operator should stop when exceeding this budget."""
 LS_MAX_TIME_PER_OP = 3  # seconds (adjustable)
+LS_MAX_TIME_IN_SINGLE = 1
+
+# GA defensive guards
+# Max attempts factor for producing offspring per missing child in a generation (used to avoid infinite loops)
+OFFSPRING_ATTEMPTS_FACTOR = 10
 
 """ ACO configuration """
 POPULATION_SIZE_ACO = 20

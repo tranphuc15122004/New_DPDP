@@ -440,10 +440,10 @@ def randon_1_LS(indivisual: Chromosome , is_limited = False , mode = 0):
     
     # Dictionary các phương pháp Local Search
     methods = {
-        'PDPairExchange': lambda: new_inter_couple_exchange(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
-        'BlockExchange': lambda: new_block_exchange(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
-        'BlockRelocate': lambda: new_block_relocate(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited),
-        'mPDG': lambda: new_multi_pd_group_relocate(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, is_limited)
+        'PDPairExchange': lambda: new_inter_couple_exchange(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map , config.LS_MAX_TIME_IN_SINGLE , is_limited),
+        'BlockExchange': lambda: new_block_exchange(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map , config.LS_MAX_TIME_IN_SINGLE, is_limited),
+        'BlockRelocate': lambda: new_block_relocate(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map , config.LS_MAX_TIME_IN_SINGLE, is_limited),
+        'mPDG': lambda: new_multi_pd_group_relocate(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map , config.LS_MAX_TIME_IN_SINGLE, is_limited)
     }
     
     # Counter cho từng phương pháp
@@ -474,7 +474,7 @@ def randon_1_LS(indivisual: Chromosome , is_limited = False , mode = 0):
     for method_name in methods.keys():
         indivisual.improved_LS_map[method_name] += counters[method_name]
     total_ls_time = time.time() - begin_LS_time
-    print(f"LS: {chosen_method} | Count: {i} | TotalTime:{total_ls_time:.3f}s | Cost:{total_cost(indivisual.id_to_vehicle, indivisual.route_map, indivisual.solution):.2f}", file=sys.stderr)
+    print(f"LS: {chosen_method} | Count: {i} | TotalTime:{total_ls_time:.3f}s | Cost:{total_cost(indivisual.id_to_vehicle, indivisual.route_map, indivisual.solution):.2f}")
 
 
 def new_crossover(parent1: Chromosome , parent2: Chromosome , PDG_map : Dict[str , List[Node]] , is_limited = False):
@@ -756,6 +756,271 @@ def new_dispatch_nodePair(node_list: list[Node]  , id_to_vehicle: Dict[str , Veh
                 tempRouteNodeList.pop(j)
     return isExhausive , bestInsertVehicleID, bestInsertPosI, bestInsertPosJ , bestNodeList
 
+
+#Trì hoãn việc triển khai các cặp node mà thời gian hoàn thành còn dư giả
+def delay_dispatch_orders(id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple] , vehicleid_to_plan: Dict[str , list[Node]]) :
+    dock_table: Dict[str, List[List[int]]] = {}
+    n: int = 0
+    vehicle_num: int = len(id_to_vehicle)
+    curr_node: List[int] = [0] * vehicle_num
+    curr_time: List[int] = [0] * vehicle_num
+    leave_last_node_time: List[int] = [0] * vehicle_num
+
+    n_node: List[int] = [0] * vehicle_num
+    index = 0
+    
+    processed_vehicleid_to_plan : Dict[str , List[Node]] = copy.deepcopy(vehicleid_to_plan)
+    emergency_dict : Dict[str , List[int]] = {k : [-1] * len(va) for k , va in processed_vehicleid_to_plan.items()}
+    
+    for vehicleID , otherVehicle in id_to_vehicle.items():
+        distance = 0
+        time  = 0
+        
+        if otherVehicle.cur_factory_id :
+            if otherVehicle.leave_time_at_current_factory > otherVehicle.gps_update_time:
+                tw: List[int] = [
+                    otherVehicle.arrive_time_at_current_factory,
+                    otherVehicle.leave_time_at_current_factory
+                ]
+                tw_list: Optional[List[List[int]]] = dock_table.get(otherVehicle.cur_factory_id)
+                if tw_list is None:
+                    tw_list = []
+                tw_list.append(tw)
+                dock_table[otherVehicle.cur_factory_id] = tw_list
+            leave_last_node_time[index] = otherVehicle.leave_time_at_current_factory
+        else:
+            leave_last_node_time[index] = otherVehicle.gps_update_time
+        
+        if vehicleid_to_plan.get(vehicleID) and len(vehicleid_to_plan.get(vehicleID)) > 0:    
+            curr_node[index] = 0
+            n_node[index] = len(vehicleid_to_plan[vehicleID]) 
+            
+            if otherVehicle.des is None:
+                if otherVehicle.cur_factory_id == vehicleid_to_plan[vehicleID][0].id:
+                    curr_time[index] = otherVehicle.leave_time_at_current_factory
+                else:
+                    # travel time from current factory to the first planned node
+                    dis_and_time = route_map.get((otherVehicle.cur_factory_id , vehicleid_to_plan[vehicleID][0].id))
+                    if dis_and_time is None:
+                        dis_and_time = route_map.get((vehicleid_to_plan[vehicleID][0].id, otherVehicle.cur_factory_id))
+                    time = int(dis_and_time[1]) if dis_and_time is not None else 0
+                    curr_time[index] = otherVehicle.leave_time_at_current_factory + time
+            else:
+                if otherVehicle.cur_factory_id is not None and len(otherVehicle.cur_factory_id) > 0:
+                    if otherVehicle.cur_factory_id == vehicleid_to_plan[vehicleID][0].id:
+                        curr_time[index]  = otherVehicle.leave_time_at_current_factory
+                    else:
+                        curr_time[index] = otherVehicle.leave_time_at_current_factory
+                        dis_and_time = route_map.get((otherVehicle.cur_factory_id , vehicleid_to_plan[vehicleID][0].id))
+                        if dis_and_time is None:
+                            dis_and_time = route_map.get((vehicleid_to_plan[vehicleID][0].id, otherVehicle.cur_factory_id))
+                        time = int(dis_and_time[1]) if dis_and_time is not None else 0
+                        curr_time[index] += time
+                else: 
+                    curr_time[index] = otherVehicle.des.arrive_time
+            n+=1
+        else:
+            curr_time[index] = math.inf
+            curr_time[index] = math.inf
+            n_node[index] = 0
+        index += 1
+    
+    while n > 0:
+        minT = math.inf
+        minT2VehicleIndex = 0
+        tTrue = minT
+        idx = 0
+        
+        for i in range (vehicle_num):
+            if curr_time[i] < minT:
+                minT = curr_time[i]
+                minT2VehicleIndex = i
+        
+        minT2VehicleIndex += 1
+        minT2VehicleID = "V_" + str(minT2VehicleIndex)
+        minT2VehicleIndex -= 1
+        
+        minTNodeList: List[Node] = []
+        minTNodeList = vehicleid_to_plan.get(minT2VehicleID)
+        minTNode = minTNodeList[curr_node[minT2VehicleIndex]]
+        
+        usedEndTime : List[int] = []
+        timeSlots : List[List[int]] =  dock_table.get(minTNode.id, [])
+        if timeSlots:
+            i = 0
+            while i < len(timeSlots):
+                time_slot = timeSlots[i]
+                if time_slot[1] <= minT:
+                    timeSlots.pop(i)  # Xóa phần tử nếu end_time <= minT
+                elif time_slot[0] <= minT < time_slot[1]:
+                    usedEndTime.append(time_slot[1])
+                    i += 1
+                else:
+                    print("------------ timeslot.start > minT --------------", file = sys.stderr)
+                    i += 1
+
+        if len(usedEndTime) < 6:
+            tTrue = minT
+        else:
+            idx = len(usedEndTime) - 6
+            usedEndTime.sort()
+            tTrue = usedEndTime[idx]
+            
+        # Determine emergency for the first node at this factory using predicted start time at dock
+        predicted_start_time = tTrue + config.APPROACHING_DOCK_TIME
+        if minTNode.delivery_item_list and len(minTNode.delivery_item_list) > 0:
+            for order_item in minTNode.delivery_item_list:
+                commit_complete_time = order_item.committed_completion_time
+                slack_time = commit_complete_time - predicted_start_time
+                if slack_time < SLACK_TIME_THRESHOLD:
+                    emergency_dict[minT2VehicleID][curr_node[minT2VehicleIndex]] = 1
+                    break
+
+        service_time = minTNodeList[curr_node[minT2VehicleIndex]].service_time
+        cur_factory_id = minTNodeList[curr_node[minT2VehicleIndex]].id
+        curr_node[minT2VehicleIndex] += 1
+
+        while (curr_node[minT2VehicleIndex] < n_node[minT2VehicleIndex] and
+            cur_factory_id == minTNodeList[curr_node[minT2VehicleIndex]].id):
+
+            delivery_item_list = minTNodeList[curr_node[minT2VehicleIndex]].delivery_item_list
+            
+            if delivery_item_list and len(delivery_item_list) > 0:
+                # predicted start time for this subsequent node accounts for prior service at this factory
+                predicted_start_time = tTrue + config.APPROACHING_DOCK_TIME + service_time
+                for order_item in delivery_item_list:
+                    commit_complete_time = order_item.committed_completion_time
+                    slack_time = commit_complete_time - predicted_start_time
+                    if slack_time < SLACK_TIME_THRESHOLD:
+                        emergency_dict["V_" + str(minT2VehicleIndex + 1)][curr_node[minT2VehicleIndex]] = 1
+                        break
+
+            service_time += minTNodeList[curr_node[minT2VehicleIndex]].service_time
+            curr_node[minT2VehicleIndex] += 1
+        
+        if curr_node[minT2VehicleIndex] >= n_node[minT2VehicleIndex]:
+            n -= 1
+            curr_node[minT2VehicleIndex] = math.inf
+            curr_time[minT2VehicleIndex] = math.inf
+            n_node[minT2VehicleIndex] = 0
+        else:
+            dis_and_time = route_map.get((cur_factory_id , minTNodeList[curr_node[minT2VehicleIndex]].id))
+            if dis_and_time is None:
+                dis_and_time = route_map.get((minTNodeList[curr_node[minT2VehicleIndex]].id, cur_factory_id))
+            if dis_and_time:
+                time = int(dis_and_time[1])
+            else:
+                time = 0
+
+            curr_time[minT2VehicleIndex] = tTrue + config.APPROACHING_DOCK_TIME + service_time + time
+            leave_last_node_time[minT2VehicleIndex] = tTrue + config.APPROACHING_DOCK_TIME + service_time
+
+        tw = [minT, tTrue + config.APPROACHING_DOCK_TIME + service_time]
+        tw_list = dock_table.get(minTNode.id, [])
+
+        tw_list.append(tw)
+        dock_table[minTNode.id] = tw_list
+    
+    for vehicleID , node_list in processed_vehicleid_to_plan.items():
+        vehicle = id_to_vehicle[vehicleID]
+        # If vehicle is currently carrying items, keep full route to satisfy LIFO/feasibility
+        has_carrying = False
+        try:
+            has_carrying = (vehicle.carrying_items is not None) and (not vehicle.carrying_items.is_empty())
+        except Exception:
+            try:
+                has_carrying = (vehicle.carrying_items is not None) and (len(vehicle.carrying_items) > 0)
+            except Exception:
+                has_carrying = False
+        if has_carrying:
+            # keep original plan for this vehicle
+            processed_vehicleid_to_plan[vehicleID] = node_list
+            continue
+        start_idx =0
+        # Only keep a delivery if its matching pickup exists; then keep both
+        keep_indices: set[int] = set()
+        # Always keep destination header if present and matches vehicle.des
+        header_kept = False
+        if node_list and vehicle.des and node_list[0].id == vehicle.des.id:
+            keep_indices.add(0)
+            header_kept = True
+            start_idx = 1
+        for idx in range(start_idx, len(node_list)):
+            if emergency_dict[vehicleID][idx] == 1 and node_list[idx].delivery_item_list:
+                target_id = node_list[idx].delivery_item_list[-1].id
+                p_idx = idx - 1
+                found_pickup = False
+                while p_idx >= start_idx:
+                    nd = node_list[p_idx]
+                    if nd.pickup_item_list and nd.pickup_item_list[0].id == target_id:
+                        found_pickup = True
+                        break
+                    p_idx -= 1
+                if found_pickup:
+                    keep_indices.add(p_idx)
+                    keep_indices.add(idx)
+
+        # Closure: for any kept pickup, also keep its matching delivery later in the plan
+        # Especially important for header that contains a pickup
+        def find_matching_delivery(after_idx: int, item_id: str) -> Optional[int]:
+            for j in range(max(after_idx, start_idx), len(node_list)):
+                nd = node_list[j]
+                if nd.delivery_item_list and nd.delivery_item_list[-1].id == item_id:
+                    return j
+            return None
+
+        # Track if we fail to close header pickup -> fallback to original plan
+        need_fallback_to_full_plan = False
+
+        # Ensure deliveries for kept pickups
+        for i in sorted(list(keep_indices)):
+            nd = node_list[i]
+            if nd.pickup_item_list:
+                pid = nd.pickup_item_list[0].id
+                j = find_matching_delivery(i + 1, pid)
+                if j is not None:
+                    keep_indices.add(j)
+                else:
+                    # If header has pickup but no delivery found, safer to return full plan
+                    if header_kept and i == 0:
+                        need_fallback_to_full_plan = True
+                        break
+
+        # filter only kept indices (urgent deliveries and their pickups), preserving order
+        if need_fallback_to_full_plan:
+            filtered = node_list
+        else:
+            filtered = [node for i , node in enumerate(processed_vehicleid_to_plan[vehicleID]) if i in keep_indices]
+
+        # Final LIFO validation against current carrying stack; if fails, drop non-header nodes
+        def lifo_ok(route_nodes: List[Node], veh: Vehicle) -> bool:
+            try:
+                ci = copy.deepcopy(veh.carrying_items)
+            except Exception:
+                return True  # if cannot copy, skip strict check
+            # simulate header node (first) then the rest
+            for nd in route_nodes:
+                if nd.delivery_item_list:
+                    for it in nd.delivery_item_list:
+                        # pop from either Stack-like or list
+                        top = ci.pop()
+                        if top is None or getattr(top, 'id', None) != getattr(it, 'id', None):
+                            return False
+                if nd.pickup_item_list:
+                    for it in nd.pickup_item_list:
+                        if hasattr(ci, 'push'):
+                            ci.push(it)
+                        else:
+                            ci.append(it)
+            # do not require empty at end; we only ensure no violation during sequence
+            return True
+
+        if filtered and not lifo_ok(filtered, vehicle):
+            # Keep only header if present to ensure feasibility
+            filtered = filtered[:1] if (filtered and vehicle.des and filtered[0].id == vehicle.des.id) else []
+        processed_vehicleid_to_plan[vehicleID] = filtered
+    
+    return processed_vehicleid_to_plan
 
 #====================================================================================================================================================================
 
@@ -1539,16 +1804,8 @@ def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_
             if any(sig in used_signatures for sig in pick_sigs):
                 continue
 
-            # Determine target vehicle if respecting source vehicle
+            # Determine target vehicle (currently not enforcing source vehicle mapping)
             selected_vehicle: Optional[str] = None
-            if respect_source_vehicle:
-                if origin == "P1":
-                    selected_vehicle = block_vehicle_map_p1.get(key)
-                else:
-                    selected_vehicle = block_vehicle_map_p2.get(key)
-                # If the mapped vehicle doesn't exist in child plan, null it to skip/fallback
-                if selected_vehicle not in child_vehicleid_to_plan:
-                    selected_vehicle = None
 
             # Try insertion at best position (append-based CI currently)
             bestInsertPos, bestInsertVehicle = cheapest_insertion_for_block(
@@ -1556,7 +1813,7 @@ def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_
                 parent1.id_to_vehicle,
                 child_vehicleid_to_plan,
                 parent1.route_map,
-                selected_vehicle=selected_vehicle if respect_source_vehicle else None,
+                selected_vehicle=None,
             )
             if bestInsertVehicle is None:
                 # Strict mode: if enforcing source vehicle and no feasible insertion, skip this block

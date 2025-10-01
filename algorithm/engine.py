@@ -345,6 +345,56 @@ def get_route_after(vehicleid_to_plan: Dict[str , list[Node]], vehicleid_to_dest
     return route_str
 
 
+def check_duplicate_nodes_in_solution(vehicleid_to_plan: Dict[str, list[Node]], vehicleid_to_destination: Dict[str, Node] = None) -> bool:
+    """
+    Kiểm tra xem có cặp node nào bị lặp trong lời giải không.
+    Hàm này hoạt động như isFeasible - trả về True nếu KHÔNG có duplicate, False nếu có duplicate.
+    
+    Returns:
+        bool: True nếu không có duplicate nodes, False nếu có duplicate nodes
+    """
+    signature_to_count = {}  # signature -> count
+    
+    # Thu thập tất cả nodes với chữ ký của chúng
+    # 1. Nodes từ vehicleid_to_destination
+    if vehicleid_to_destination:
+        for vehicle_id, node in vehicleid_to_destination.items():
+            if node is not None:
+                signature = get_node_content_signature(node)
+                signature_to_count[signature] = signature_to_count.get(signature, 0) + 1
+                if signature_to_count[signature] > 1:
+                    return False  # Phát hiện duplicate ngay lập tức
+    
+    # 2. Nodes từ vehicleid_to_plan
+    for vehicle_id, node_list in vehicleid_to_plan.items():
+        if node_list:
+            for node in node_list:
+                signature = get_node_content_signature(node)
+                signature_to_count[signature] = signature_to_count.get(signature, 0) + 1
+                if signature_to_count[signature] > 1:
+                    return False  # Phát hiện duplicate ngay lập tức
+    
+    return True  # Không có duplicate nodes
+
+
+def get_node_content_signature(node: Node) -> str:
+    """
+    Tạo chữ ký mô tả nội dung của node (để debug)
+    """
+    pickup_items = node.pickup_item_list if node.pickup_item_list else []
+    delivery_items = node.delivery_item_list if node.delivery_item_list else []
+    
+    pickup_str = f"p{len(pickup_items)}"
+    if pickup_items:
+        pickup_str += f"_{pickup_items[0].id}"
+    
+    delivery_str = f"d{len(delivery_items)}"
+    if delivery_items:
+        delivery_str += f"_{delivery_items[0].id}"
+    
+    return f"{delivery_str}_{pickup_str}" if delivery_items else pickup_str
+
+
 def create_Pickup_Delivery_nodes(tmp_itemList: list[OrderItem] , id_to_factory: Dict[str , Factory]) -> list[Node]:
     res: list[Node] = []
     if tmp_itemList:
@@ -831,6 +881,7 @@ def isFeasible(route_node_list : List[Node] , carrying_items : List[OrderItem] ,
     return (not unload_item_list)
 
 
+
 def cost_of_a_route (temp_route_node_list : List[Node] , vehicle: Vehicle , id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple] , vehicleid_to_plan: Dict[str , list[Node]] , mode = 'total') -> float:
     curr_factoryID = vehicle.cur_factory_id
     driving_dis  : float = 0.0
@@ -841,6 +892,15 @@ def cost_of_a_route (temp_route_node_list : List[Node] , vehicle: Vehicle , id_t
     
     if (temp_route_node_list) and (not isFeasible(temp_route_node_list , carrying_Items , capacity)):
         return math.inf
+    
+    # Kiểm tra duplicate nodes trước khi tính cost
+    if not check_duplicate_nodes_in_solution(vehicleid_to_plan):
+        return math.inf
+    
+    for vehicleID , vehicle in id_to_vehicle.items():
+        carry = vehicle.carrying_items if vehicle.des else []
+        if vehicleid_to_plan[vehicleID] or len(vehicleid_to_plan[vehicleID]) > 0:
+            if not isFeasible(vehicleid_to_plan[vehicleID] , carry , vehicle.board_capacity): return math.inf
     
     dock_table: Dict[str, List[List[int]]] = {}
     n: int = 0
@@ -1052,6 +1112,15 @@ def cost_of_a_route (temp_route_node_list : List[Node] , vehicle: Vehicle , id_t
 
 
 def total_cost(id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple] , vehicleid_to_plan: Dict[str , list[Node]]) -> float:
+    # Kiểm tra duplicate nodes trước khi tính cost
+    if not check_duplicate_nodes_in_solution(vehicleid_to_plan):
+        return math.inf
+    
+    for vehicleID , vehicle in id_to_vehicle.items():
+        carry = vehicle.carrying_items if vehicle.des else []
+        if vehicleid_to_plan[vehicleID] or len(vehicleid_to_plan[vehicleID]) > 0:
+            if not isFeasible(vehicleid_to_plan[vehicleID] , carry , vehicle.board_capacity): return math.inf
+    
     driving_dis  : float = 0.0
     overtime_Sum : float = 0.0
     objF : float = 0.0
