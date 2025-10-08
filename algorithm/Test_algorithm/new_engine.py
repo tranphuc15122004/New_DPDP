@@ -386,7 +386,7 @@ def remove_similar_individuals(population: List[Chromosome], threshold: float = 
         
         for unique_individual in unique_population:
             distance = calculate_chromosome_distance(individual, unique_individual)
-            if distance < threshold:
+            if distance <= threshold:
                 # Giữ cá thể có fitness tốt hơn
                 if individual.fitness < unique_individual.fitness:
                     unique_population.remove(unique_individual)
@@ -1310,7 +1310,7 @@ def update_blockmap(blockmap1 : Dict[str, List[Node]] , blockmap2 : Dict[str , L
                 stack.pop()
         return len(stack) == 0
 
-    salvage_min_pairs = 1          # keep residual only if at least this many pickup-delivery pairs
+    salvage_min_pairs = 1           # keep residual only if at least this many pickup-delivery pairs
     salvage_min_ratio = 0.0         # set >0 (e.g. 0.5) to enforce size ratio vs original, 0 disables
     max_new_segments_per_block = 2  # with LIFO we expect at most 2
 
@@ -1320,6 +1320,7 @@ def update_blockmap(blockmap1 : Dict[str, List[Node]] , blockmap2 : Dict[str , L
         to_delete : List[str] = []
         to_add : List[Tuple[str, List[Node]]] = []
         # iterate over snapshot because we will modify after
+        
         for key, nodes in list(bmap.items()):
             if not nodes:
                 to_delete.append(key)
@@ -1346,7 +1347,7 @@ def update_blockmap(blockmap1 : Dict[str, List[Node]] , blockmap2 : Dict[str , L
             if len(nodes) == len(used_block_nodes) and all(a is b for a,b in zip(nodes, used_block_nodes)):
                 to_delete.append(key)
                 continue
-
+            
             # Attempt salvage: split into contiguous segments whose nodes do NOT contain any newly used item ids
             segments : List[List[Node]] = []
             current : List[Node] = []
@@ -1403,6 +1404,7 @@ def update_blockmap(blockmap1 : Dict[str, List[Node]] , blockmap2 : Dict[str , L
                 while new_key in bmap or any(k == new_key for k,_ in to_add):
                     suffix += 1
                     new_key = f"{base_new_key}_{suffix}"
+                
                 to_add.append((new_key, seg))
                 added_segments += 1
 
@@ -1538,22 +1540,6 @@ def extract_pickup_signatures(nodes: List[Node]) -> set[str]:
             sigs.add(ps)
     return sigs
 
-def route_is_lifo_valid(route: List[Node]) -> bool:
-    stack: List[str] = []
-    seen_pickups: set[str] = set()
-    for nd in route:
-        ps = pickup_signature_of(nd)
-        if ps:
-            if ps in seen_pickups:
-                return False
-            stack.append(ps)
-            seen_pickups.add(ps)
-        ds = delivery_signature_of(nd)
-        if ds:
-            if not stack or stack[-1] != ds:
-                return False
-            stack.pop()
-    return len(stack) == 0
 
 def build_block_vehicle_map(blockmap: Dict[str, List[Node]], node2veh: Dict[int, str]) -> Dict[str, Optional[str]]:
     res: Dict[str, Optional[str]] = {}
@@ -1652,22 +1638,28 @@ def find_best_block(blockmap1: Dict[str, List[Node]],
     return best[1]
 
 def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_plan : Dict[str , List[Node]] , PDG_map: Dict[str , List[Node]] , static_single_pass: bool = False):
+    begin = time.time()
     
     # Cac super node
     new_PDG_map : Dict[str , List[Node]] = {}
     for key , value in PDG_map.items():
-        key = f'{len(value[0].pickup_item_list)}_{value[0].pickup_item_list[0].id}'
+        if len(value )!= 2: print("ERROR 1")
+        first_node = value[0]
+        if first_node.pickup_item_list and first_node.delivery_item_list:
+            print ("ERROR 2")
+        if first_node.pickup_item_list:
+            key = f'{len(first_node.pickup_item_list)}_{first_node.pickup_item_list[0].id}'
+        elif first_node.delivery_item_list:
+            key = f'{len(first_node.delivery_item_list)}_{first_node.delivery_item_list[-1].id}'
+        
+        
         new_PDG_map[key] = value
         
     check_valid : Dict[str , int]= {key : 0 for key in new_PDG_map.keys()}
     
     blockmap_parent1 = extract_block_from_solution(parent1.solution , parent1.id_to_vehicle)
     blockmap_parent2 = extract_block_from_solution(parent2.solution , parent2.id_to_vehicle)
-    node2veh_p1 = build_node_to_vehicle(parent1.solution)
-    node2veh_p2 = build_node_to_vehicle(parent2.solution)
-    
-    block_vehicle_map_p1: Dict[str, Optional[str]] = build_block_vehicle_map(blockmap_parent1, node2veh_p1)
-    block_vehicle_map_p2: Dict[str, Optional[str]] = build_block_vehicle_map(blockmap_parent2, node2veh_p2)
+
 
     # ========= Khởi tạo biến điều khiển vòng lặp =========
     DEBUG = False  # set True to enable verbose logging
@@ -1678,7 +1670,7 @@ def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_
     # Tham số dừng (có thể điều chỉnh / đưa ra ngoài nếu cần tinh chỉnh sau)
     MAX_ITER = max(5, 2 * total_blocks_target) if total_blocks_target > 0 else 20
     MAX_NO_GAIN = 5          # số vòng liên tiếp không có gain mới thì dừng
-    TIME_BUDGET_SEC = 10   # ngân sách thời gian cho riêng crossover này
+    TIME_BUDGET_SEC = 5   # ngân sách thời gian cho riêng crossover này
     MIN_GAIN_PER_BLOCK = 1   # yêu cầu tối thiểu signature mới / vòng
 
     # Ghi lại lý do dừng cuối cùng (debug)
@@ -1820,7 +1812,9 @@ def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_
                 continue
             target_route = child_vehicleid_to_plan[bestInsertVehicle]
             target_route[bestInsertPos: bestInsertPos] = nodes
-            if not route_is_lifo_valid(target_route):
+            target_vehicle = parent1.id_to_vehicle[bestInsertVehicle] 
+            
+            if not isFeasible(target_route , target_vehicle.carrying_items , target_vehicle.board_capacity):
                 # rollback
                 del target_route[bestInsertPos: bestInsertPos + len(nodes)]
                 continue
@@ -1833,8 +1827,8 @@ def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_
     score_cache_p1: Dict[str, Tuple[float, float, float]] = {}
     score_cache_p2: Dict[str, Tuple[float, float, float]] = {}
     
-    
     while not static_single_pass:
+        begin  = time.time()
         if is_finished():
             if DEBUG:
                 print(f"[new_crossver2] STOP before-iter reason={last_stop_reason} iter={iteration}", file=sys.stderr)
@@ -1926,9 +1920,10 @@ def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_
                 break
             target_route = child_vehicleid_to_plan[bestInsertVehicle]
             target_route[bestInsertPos: bestInsertPos] = best_block
+            target_vehicle = parent1.id_to_vehicle[bestInsertVehicle]
 
             # Validate only the modified vehicle route for LIFO + uniqueness
-            if not route_is_lifo_valid(target_route):
+            if not isFeasible(target_route , target_vehicle.carrying_items , target_vehicle.board_capacity):
                 # Rollback insertion
                 del target_route[bestInsertPos: bestInsertPos + len(best_block)]
                 # Remove this block from future consideration
@@ -1967,6 +1962,7 @@ def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_
             if DEBUG:
                 traceback.print_exc(file=sys.stderr)
             break
+        #print(time.time() - begin)
     
     
     if DEBUG:
@@ -1975,7 +1971,6 @@ def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_
             f"used_signatures={len(used_signatures)} | final_reason={last_stop_reason}",
             file=sys.stderr
         )
-    
     
     # kiểm tra lại lời giải con và xử lý các node thừa hoặc thiếu
     for vehicleID in parent1.id_to_vehicle.keys():
@@ -2010,48 +2005,281 @@ def new_crossver2(parent1: Chromosome , parent2: Chromosome , Base_vehicleid_to_
     # Kiem tra lai và thêm các node còn thiếu vào con   
     for key, value in check_valid.items():
         if value == 0:
-            if random.uniform(0 , 1) <1:
+            
+            # truong hop bi thieu 1 super node thi gan theo chien luoc CI vao solution hien tai
+            node_list = new_PDG_map[key]
+            
+            if node_list:
+                bestInsertPos, bestInsertVehicle = cheapest_insertion_for_block(node_list, parent1.id_to_vehicle, child_vehicleid_to_plan, parent1.route_map)
+                
+            if bestInsertVehicle is None:
+                last_stop_reason = 'no-insertion-position'
+                print(f"[new_crossver2] reinsert abandon block | insertion failed -> stopping", file=sys.stderr)
+                break
+            target_route = child_vehicleid_to_plan[bestInsertVehicle]
+            target_route[bestInsertPos: bestInsertPos] = node_list
+    
+    #print (time.time() - begin)
+    return Chromosome(child_vehicleid_to_plan , parent1.route_map , parent1.id_to_vehicle)
+
+
+def fix_duppication_nodes (inidividual : Chromosome , PDG_map: Dict[str , List[Node]] ):
+    # Cac super node
+    new_PDG_map : Dict[str , List[Node]] = {}
+    for key , value in PDG_map.items():
+        if len(value )!= 2: print("ERROR 1 _ fix ")
+        first_node = value[0]
+        if first_node.pickup_item_list and first_node.delivery_item_list:
+            print ("ERROR 2 _ fix")
+        if first_node.pickup_item_list:
+            key = f'{len(first_node.pickup_item_list)}_{first_node.pickup_item_list[0].id}'
+        elif first_node.delivery_item_list:
+            key = f'{len(first_node.delivery_item_list)}_{first_node.delivery_item_list[-1].id}'
+        
+        
+        new_PDG_map[key] = value
+        
+    check_valid : Dict[str , int]= {key : 0 for key in new_PDG_map.keys()}
+    
+    for vID, plan in inidividual.solution.items():
+        veh = inidividual.id_to_vehicle[vID]
+        carry = veh.carrying_items
+        if plan:
+            if isFeasible(plan ,carry ,veh.board_capacity) == False:
+                print("Solution trien vao bi loi !!!!")
+    
+    # kiểm tra lại lời giải con và xử lý các node thừa hoặc thiếu
+    for vehicleID in inidividual.id_to_vehicle.keys():
+        redundant = []
+        del_index = []
+        # Duyệt ngược danh sách để tìm và xóa nút thừa    
+        for i in range(len(inidividual.solution[vehicleID]) - 1, -1, -1):  
+            node = inidividual.solution[vehicleID][i]
+            
+            if node.pickup_item_list:
+                if redundant and node.pickup_item_list[0].id == redundant[-1]:
+                    redundant.pop()  # Loại bỏ phần tử tương ứng trong danh sách `redundant`
+                    del_index.append(i)
+            else:
+                key = f'{len(node.delivery_item_list)}_{node.delivery_item_list[-1].id}'
+                
+                if key in new_PDG_map:
+                    check_valid[key] += 1
+                    
+                    # nếu tìm được một super node thừa
+                    if check_valid[key] > 1:
+                        first_itemID_of_redundant_supernode = key.split('_')[-1]
+                        redundant.append(first_itemID_of_redundant_supernode)
+                        #print(f"Redundant nodes: {redundant}" , file= sys.stderr)
+                        # Xóa node giao của super node thừa
+                        del_index.append(i)
+                        #print('Đã xóa 1 super node thừa' , file= sys.stderr)
+        for i in del_index:
+            inidividual.solution[vehicleID].pop(i)
+    
+    
+    # Kiem tra lai và thêm các node còn thiếu vào con   
+    for key, value in check_valid.items():
+        if value == 0:
+            
+            # truong hop bi thieu 1 super node thi gan theo chien luoc CI vao solution hien tai
+            node_list = new_PDG_map[key]
+            
+            if node_list:
+                bestInsertPos, bestInsertVehicle = cheapest_insertion_for_block(node_list, inidividual.id_to_vehicle, inidividual.solution, inidividual.route_map)
+                
+            if bestInsertVehicle is None:
+                last_stop_reason = 'no-insertion-position'
+                print(f"[new_crossver2] reinsert abandon block | insertion failed -> stopping", file=sys.stderr)
+                break
+            target_route = inidividual.solution[bestInsertVehicle]
+            target_route[bestInsertPos: bestInsertPos] = node_list
+
+
+def fix_duppication_nodes2 (inidividual : Chromosome ,   PDG_map: Dict[str , List[Node]] , Base_vehicleid_to_plan: Dict[str, List[Node]] , root_vehicleid_to_plan: Dict[str, List[Node]] ):
+    # Cac super node
+    new_PDG_map : Dict[str , List[Node]] = {}
+    for key , value in PDG_map.items():
+        if len(value)!= 2: print("ERROR 1 _ fix ")
+        first_node = value[0]
+        if first_node.pickup_item_list and first_node.delivery_item_list:
+            print ("ERROR 2 _ fix")
+        
+        if first_node.pickup_item_list:
+            key = f'{len(first_node.pickup_item_list)}_{first_node.pickup_item_list[0].id}'
+        elif first_node.delivery_item_list:
+            key = f'{len(first_node.delivery_item_list)}_{first_node.delivery_item_list[-1].id}'
+            print("ERROR 3_Node delivery dat truoc")
+        
+        new_PDG_map[key] = value
+    
+    check_valid : Dict[str , int]= {key : 0 for key in new_PDG_map.keys()}
+    
+    for vID, plan in inidividual.solution.items():
+        veh = inidividual.id_to_vehicle[vID]
+        carry = veh.carrying_items
+        if plan:
+            if isFeasible(plan ,carry ,veh.board_capacity) == False:
+                print("ERROR 4_Solution trien vao bi loi !!!!")
+                
+    temp = 0
+    for vid, plan in inidividual.solution.items():
+        temp += len(plan)
+    
+    
+    for vid, plan in root_vehicleid_to_plan.items():
+        temp -= len(plan)
+        
+    
+    if temp == 0:
+        return True
+    else:
+        
+        # kiểm tra lại lời giải con và xử lý các node thừa hoặc thiếu
+        for vehicleID in inidividual.id_to_vehicle.keys():
+            redundant = []
+            del_index = []
+            # Duyệt ngược danh sách để tìm và xóa nút thừa    
+            for i in range(len(inidividual.solution[vehicleID]) - 1, -1, -1):  
+                node = inidividual.solution[vehicleID][i]
+                
+                if node.pickup_item_list and node.delivery_item_list:
+                    if redundant and node.pickup_item_list[0].id == redundant[-1]:
+                        redundant.pop()  # Loại bỏ phần tử tương ứng trong danh sách `redundant`
+                        del_index.append(i)
+                elif node.delivery_item_list and node.pickup_item_list:
+                    key = f'{len(node.delivery_item_list)}_{node.delivery_item_list[-1].id}'
+                    
+                    if key in new_PDG_map:
+                        check_valid[key] += 1
+                        
+                        # nếu tìm được một super node thừa
+                        if check_valid[key] > 1:
+                            first_itemID_of_redundant_supernode = key.split('_')[-1]
+                            redundant.append(first_itemID_of_redundant_supernode)
+                            # Xóa node giao của super node thừa
+                            del_index.append(i)
+                            #print('Đã xóa 1 super node thừa' , file= sys.stderr)
+            for i in del_index:
+                inidividual.solution[vehicleID].pop(i)
+        
+        
+        # Kiem tra lai và thêm các node còn thiếu vào con   
+        for key, value in check_valid.items():
+            if value == 0:
                 # truong hop bi thieu 1 super node thi gan theo chien luoc CI vao solution hien tai
                 node_list = new_PDG_map[key]
                 
                 if node_list:
-                    bestInsertPos, bestInsertVehicle = cheapest_insertion_for_block(node_list, parent1.id_to_vehicle, child_vehicleid_to_plan, parent1.route_map)
+                    bestInsertPos, bestInsertVehicle = cheapest_insertion_for_block(node_list, inidividual.id_to_vehicle, inidividual.solution, inidividual.route_map)
                     
                 if bestInsertVehicle is None:
-                    last_stop_reason = 'no-insertion-position'
-                    print(f"[new_crossver2] reinsert abandon block | insertion failed -> stopping", file=sys.stderr)
-                    break
-                target_route = child_vehicleid_to_plan[bestInsertVehicle]
+                    print(f"[fix error] reinsert abandon block | insertion failed -> stopping")
+                    continue
+                target_route = inidividual.solution[bestInsertVehicle]
                 target_route[bestInsertPos: bestInsertPos] = node_list
-                
-                """ selected_vehicleID = random.choice(list(parent1.id_to_vehicle.keys()))
-                
-                node_list = new_PDG_map[key]
-                isExhausive = False
-                route_node_list : List[Node] = []
-                
-                if node_list:
-                    isExhausive , bestInsertVehicleID, bestInsertPosI, bestInsertPosJ , bestNodeList = new_dispatch_nodePair(node_list , parent2.id_to_vehicle , child_vehicleid_to_plan , parent2.route_map  )
-                    
-                route_node_list = child_vehicleid_to_plan.get(bestInsertVehicleID , [])
 
-                if isExhausive:
-                    route_node_list = bestNodeList[:]
+        return False
+    
+    
+
+def decrease_node_num(vehicleid_to_plan: Dict[str , List[Node]], id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple] , num_nodes = 0):
+    
+    new_vehicle_to_plan : Dict[str , List[Node]] = {}
+    for VID , plan in vehicleid_to_plan.items():
+        new_vehicle_to_plan[VID] = []
+        for node in plan:
+            new_vehicle_to_plan[VID].append(copy.deepcopy(node))
+            
+    dis_order_super_node,  _ = get_UnongoingSuperNode(vehicleid_to_plan , id_to_vehicle)
+    ls_node_pair_num = len(dis_order_super_node)
+    if ls_node_pair_num == 0:
+        return None
+    
+    pdg_Map : Dict[str , List[Node]] = {}
+    
+    for idx, pdg in dis_order_super_node.items():
+        pickup_node = None
+        delivery_node = None
+        node_list: List[Node] = []
+        pos_i = 0
+        pos_j = 0
+        d_num = len(pdg) // 2
+        index = 0
+
+        if pdg:
+            for v_and_pos_str, node in pdg.items():
+                if index % 2 == 0:
+                    vehicleID = v_and_pos_str.split(",")[0]
+                    pos_i = int(v_and_pos_str.split(",")[1])
+                    pickup_node = node
+                    node_list.insert(0, pickup_node)
+                    index += 1
                 else:
-                    if route_node_list is None:
-                        route_node_list = []
-                    
-                    new_order_pickup_node = node_list[0]
-                    new_order_delivery_node = node_list[1]
-                    
-                    route_node_list.insert(bestInsertPosI, new_order_pickup_node)
-                    route_node_list.insert(bestInsertPosJ, new_order_delivery_node)
-                child_vehicleid_to_plan[bestInsertVehicleID] = route_node_list """
-                
-            else:
-                node_list = new_PDG_map[key]
-                random_dispatch_nodePair(node_list, parent1.id_to_vehicle, child_vehicleid_to_plan)
+                    pos_j = int(v_and_pos_str.split(",")[1])
+                    delivery_node = node
+                    node_list.append(delivery_node)
+                    index += 1
+                    pos_j = pos_j - d_num + 1
+
+            k : str = f"{vehicleID},{int(pos_i)}+{int(pos_j)}"
+            pdg_Map[k] = node_list
+            
+    if len(pdg_Map) < 2:
+        return None
+
+    num_pairs_to_relocate = max(1, int(len(pdg_Map) - (num_nodes )))
+    pairs_to_relocate = random.sample(list(pdg_Map.keys()), num_pairs_to_relocate)
     
-    #print((end1 - begin1) / (time.time() - start_cross_time) *  100)
+    # Lưu trữ các cặp node sẽ được gán lại
+    relocated_pairs : Dict[str, List[Node]] = {}
     
-    return Chromosome(child_vehicleid_to_plan , parent1.route_map , parent1.id_to_vehicle)
+    # Nhóm các cặp node cần xóa theo xe
+    vehicle_removal_info : Dict[str, List[tuple]] = {}
+    
+    for key in pairs_to_relocate:
+        relocated_pairs[key] = pdg_Map[key]
+        
+        # Lấy thông tin vị trí và xe
+        vehicle_pos_info = key.split(',')
+        vehicle_id = vehicle_pos_info[0]
+        positions = vehicle_pos_info[1].split('+')
+        pos_i = int(positions[0])
+        pos_j = int(positions[1])
+        
+        node_list = pdg_Map[key]
+        d_num = len(node_list) // 2
+        
+        # Thêm thông tin xóa vào dictionary theo xe
+        if vehicle_id not in vehicle_removal_info:
+            vehicle_removal_info[vehicle_id] = []
+        vehicle_removal_info[vehicle_id].append((pos_i, pos_i + d_num, pos_j, pos_j + d_num))
+    
+    # Xây dựng lời giải sau khi bỏ những cặp sẽ được gán lại
+    for vehicle_id, removal_list in vehicle_removal_info.items():
+        route_node_list = new_vehicle_to_plan.get(vehicle_id, [])
+        
+        # Thu thập tất cả các chỉ số cần xóa
+        indices_to_remove = set()
+        for pos_i_start, pos_i_end, pos_j_start, pos_j_end in removal_list:
+            # Thêm chỉ số pickup nodes
+            for idx in range(pos_i_start, pos_i_end):
+                if idx < len(route_node_list):
+                    indices_to_remove.add(idx)
+            # Thêm chỉ số delivery nodes
+            for idx in range(pos_j_start, pos_j_end):
+                if idx < len(route_node_list):
+                    indices_to_remove.add(idx)
+        
+        # Sắp xếp chỉ số theo thứ tự giảm dần để xóa từ cuối lên đầu
+        sorted_indices = sorted(indices_to_remove, reverse=True)
+        
+        # Xóa các node theo thứ tự từ cuối lên đầu
+        for idx in sorted_indices:
+            if idx < len(route_node_list):
+                del route_node_list[idx]
+        
+        new_vehicle_to_plan[vehicle_id] = route_node_list    
+    
+    #print(time.time() - begin)
+    return new_vehicle_to_plan

@@ -31,7 +31,7 @@ def get_remaining_time() -> float:
 """GA configuration"""
 POPULATION_SIZE = 40
 NUMBER_OF_GENERATION = 20
-MUTATION_RATE = 0.1
+MUTATION_RATE = 0.25
 LS_MAX = 20
 IMPROVED_IN_CROSS = 0
 IMPROVED_IN_MUTATION = 0
@@ -43,6 +43,58 @@ LS_MAX_TIME_IN_SINGLE = 1
 # GA defensive guards
 # Max attempts factor for producing offspring per missing child in a generation (used to avoid infinite loops)
 OFFSPRING_ATTEMPTS_FACTOR = 10
+
+def adaptive_config(num_orders: int, num_vehicles: int | None = None, time_budget_sec: float | None = None) -> dict:
+    """Adapt GA configuration based on current workload.
+
+    Mapping rule (as requested):
+    - Map number of orders in [20, 70] linearly to population size in [40, 10].
+      Below 20 orders -> POPULATION_SIZE = 40
+      Above 80 orders -> POPULATION_SIZE = 10
+
+    Other parameters remain unchanged.
+
+    Returns a summary dict of the applied parameters for logging.
+    """
+    global POPULATION_SIZE
+
+    # Define ranges
+    min_orders, max_orders = 20, 80
+    max_pop, min_pop = 40, 10
+    min_mut, max_mut = 0.1, 0.4
+    min_ls, max_ls = 20, 100
+
+    # Clamp and interpolate linearly
+    if num_orders <= min_orders:
+        pop = max_pop
+        mut = min_mut
+        ls = min_ls
+    elif num_orders >= max_orders:
+        pop = min_pop
+        mut = max_mut
+        ls = max_ls
+    else:
+        ratio = (num_orders - min_orders) / (max_orders - min_orders)
+        pop = round(max_pop + ratio * (min_pop - max_pop))
+        mut = min_mut + ratio * (max_mut - min_mut)
+        ls = round(min_ls + ratio * (max_ls - min_ls))
+
+    global POPULATION_SIZE, MUTATION_RATE, LS_MAX
+    POPULATION_SIZE = int(pop)
+    MUTATION_RATE = float(mut)
+    LS_MAX = int(ls)
+
+    return {
+        "num_orders": int(num_orders),
+        "num_vehicles": int(num_vehicles) if num_vehicles is not None else None,
+        "time_budget_sec": float(time_budget_sec) if time_budget_sec is not None else None,
+        "POPULATION_SIZE": POPULATION_SIZE,
+        "NUMBER_OF_GENERATION": NUMBER_OF_GENERATION,
+        "MUTATION_RATE": MUTATION_RATE,
+        "LS_MAX": LS_MAX,
+        "LS_MAX_TIME_PER_OP": LS_MAX_TIME_PER_OP,
+        "LS_MAX_TIME_IN_SINGLE": LS_MAX_TIME_IN_SINGLE,
+    }
 
 """ ACO configuration """
 POPULATION_SIZE_ACO = 20

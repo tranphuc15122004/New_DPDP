@@ -2,3 +2,4 @@ numpy
 simpy
 pandas
 psutil
+matplotlib
