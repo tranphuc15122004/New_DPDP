@@ -837,6 +837,7 @@ def cost_of_a_route (temp_route_node_list : List[Node] , vehicle: Vehicle , id_t
     curr_factoryID = vehicle.cur_factory_id
     driving_dis  : float = 0.0
     overtime_Sum : float = 0.0
+    waiting_Sum  : float = 0.0
     objF : float = 0.0
     capacity = vehicle.board_capacity
     carrying_Items : List[OrderItem] = vehicle.carrying_items if vehicle.des else []
@@ -1004,7 +1005,11 @@ def cost_of_a_route (temp_route_node_list : List[Node] , vehicle: Vehicle , id_t
             idx = len(usedEndTime) - 6
             usedEndTime.sort()
             tTrue = usedEndTime[idx]
-            
+
+        # Accumulate waiting time at this factory (queueing delay before service starts)
+        if minT != math.inf and tTrue != math.inf:
+            waiting_Sum += max(0, tTrue - minT)
+
         service_time = minTNodeList[curr_node[minT2VehicleIndex]].service_time
         cur_factory_id = minTNodeList[curr_node[minT2VehicleIndex]].id
         curr_node[minT2VehicleIndex] += 1
@@ -1048,7 +1053,9 @@ def cost_of_a_route (temp_route_node_list : List[Node] , vehicle: Vehicle , id_t
         tw_list.append(tw)
         dock_table[minTNode.id] = tw_list
     
-    objF = (config.Delta * overtime_Sum) + (driving_dis / float(len(id_to_vehicle)))
+    # Weight for waiting time; falls back to config.Delta if no dedicated setting is present
+    waiting_weight = config.WAITING_WEIGHT
+    objF = (config.Delta * overtime_Sum) + (driving_dis / float(len(id_to_vehicle))) + (waiting_weight * waiting_Sum)
     if mode == 'overtime':
         return (config.Delta * overtime_Sum)
     elif mode  == 'distance':
@@ -1059,14 +1066,10 @@ def cost_of_a_route (temp_route_node_list : List[Node] , vehicle: Vehicle , id_t
 
 
 def total_cost(id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tuple] , vehicleid_to_plan: Dict[str , list[Node]]) -> float:
-    """ for vehicleID , vehicle in id_to_vehicle.items():
-        carry = vehicle.carrying_items 
-        if vehicleid_to_plan[vehicleID] or len(vehicleid_to_plan[vehicleID]) > 0:
-            if not isFeasible(vehicleid_to_plan[vehicleID] , carry , vehicle.board_capacity): return math.inf """
-    
     driving_dis  : float = 0.0
     overtime_Sum : float = 0.0
-    objF : float = 0.0
+    waiting_Sum  : float = 0.0
+    objF : float  = 0.0
     dock_table: Dict[str, List[List[int]]] = {}
     n: int = 0
     vehicle_num: int = len(id_to_vehicle)
@@ -1182,7 +1185,11 @@ def total_cost(id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tupl
             idx = len(usedEndTime) - 6
             usedEndTime.sort()
             tTrue = usedEndTime[idx]
-            
+
+        # Accumulate waiting time at this factory (queueing delay before service starts)
+        if minT != math.inf and tTrue != math.inf:
+            waiting_Sum += max(0, tTrue - minT)
+
         service_time = minTNodeList[curr_node[minT2VehicleIndex]].service_time
         cur_factory_id = minTNodeList[curr_node[minT2VehicleIndex]].id
         curr_node[minT2VehicleIndex] += 1
@@ -1227,7 +1234,9 @@ def total_cost(id_to_vehicle: Dict[str , Vehicle] , route_map: Dict[tuple , tupl
         tw_list.append(tw)
         dock_table[minTNode.id] = tw_list
     
-    objF = (config.Delta * overtime_Sum) + (driving_dis / float(len(id_to_vehicle)))
+    # Weight for waiting time; falls back to config.Delta if no dedicated setting is present
+    waiting_weight = config.WAITING_WEIGHT
+    objF = (config.Delta * overtime_Sum) + (driving_dis / float(len(id_to_vehicle))) + (waiting_weight * waiting_Sum)
     if objF < 0:
         print("the objective function less than 0" , file= sys.stderr)
     return objF
@@ -1277,7 +1286,6 @@ def get_UnongoingSuperNode (vehicleid_to_plan: Dict[str , List[Node]] , id_to_ve
                                 while p_and_d_node_map:
                                     temp = dict(list(p_and_d_node_map.items())[:2])
                                     UnongoingSuperNodes[NodePairNum] = temp
-                                    #print(UnongoingSuperNodes, file = sys.stderr)
                                     NodePairNum += 1
                                     for key in temp.keys():
                                         del p_and_d_node_map[key]

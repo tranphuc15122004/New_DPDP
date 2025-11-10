@@ -260,5 +260,82 @@ __all__ = [
     'compute_adaptive_ratio',
     'compute_adaptive_ratio_quadratic',
     'compute_adaptive_ratio_concave',
+    'compute_adaptive_ratio_erfc',
     'params_from_config',
 ]
+
+def compute_adaptive_ratio_erfc(
+    num_orders: int,
+    num_vehicles: int,
+    p: AdaptiveRatioParams,
+    *,
+    center: float = 0.7,
+    width: float = 0.12,
+    cutoff: bool = True,
+) -> Dict[str, Any]:
+    """ERFC-based smooth schedule with controllable center and width.
+
+    base_raw = 0.5 * erfc( (prog - center) / (sigma * sqrt(2)) ), prog = n/T
+    where sigma = width. This yields a bell-tail shape that stays high early
+    and drops smoothly around 'center' with spread 'width'.
+
+    Properties:
+      - base_raw(0) ~ 1 if center>0 and width small
+      - base_raw(1) ~ 0 if center<1 and width small
+      - Increasing width -> gentler slope; decreasing width -> sharper drop.
+    """
+    p.clamp()
+    T = max(1, p.threshold_orders)
+    n = max(0, num_orders)
+    prog = min(1.0, n / T)
+
+    # Numerical safety
+    sigma = max(1e-6, float(width))
+    mu = float(center)
+
+    # Helper for ERFC value at a given progress
+    def erfc_val(pv: float) -> float:
+        zloc = (pv - mu) / (sigma * math.sqrt(2.0))
+        try:
+            return 0.5 * math.erfc(zloc)
+        except AttributeError:
+            return 0.5 * (1.0 - math.erf(zloc))
+
+    # Raw values at endpoints and current progress
+    raw_start = erfc_val(0.0)
+    raw_end = erfc_val(1.0)
+    raw_prog = erfc_val(prog)
+
+    # Normalize so that base_raw(0)=1 and base_raw(1)=0
+    denom = raw_start - raw_end
+    if abs(denom) < 1e-12:
+        base_raw = 0.0  # degenerate width -> fallback flat
+    else:
+        base_raw = (raw_prog - raw_end) / denom
+
+    base_raw = max(0.0, min(1.0, base_raw))
+    base = base_raw
+
+    ratio_pre = p.min_ratio + (p.max_ratio - p.min_ratio) * base
+    ratio = ratio_pre
+    if cutoff and n >= T:
+        ratio = 0.0
+    ratio = max(0.0, min(1.0, ratio))
+
+    return {
+        'num_orders' : num_orders,
+        'mode': 'erfc',
+        'raw_prog' : raw_prog,
+        'ratio': ratio,
+        'ratio_pre': ratio_pre,
+        'base': base,
+        'base_raw': base_raw,
+        'center': mu,
+        'width': sigma,
+        'num_orders': n,
+        'num_vehicles': num_vehicles,
+        'threshold_T': T,
+        'min_ratio': p.min_ratio,
+        'max_ratio': p.max_ratio,
+        'cutoff': cutoff,
+    }

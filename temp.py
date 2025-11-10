@@ -5,6 +5,7 @@ from algorithm.Test_algorithm.adaptive_ratio import (
     compute_adaptive_ratio,
     compute_adaptive_ratio_quadratic,
     compute_adaptive_ratio_concave,
+    compute_adaptive_ratio_erfc,
 )
 
 
@@ -15,8 +16,8 @@ def adaptive_local_configs(num_order: int, num_vehicles: int):
     global CROSSOVER_TYPE_RATIO
     # Standalone plotting parameters (can adjust here for experiments)
     params = AdaptiveRatioParams(
-        threshold_orders=150,
-        kww_beta=0.7,
+        threshold_orders=100,
+        kww_beta=3,
         kww_tau_factor=10.0,
         min_ratio=0.0,
         max_ratio=1.0,
@@ -58,49 +59,110 @@ def adaptive_local_configs_quadratic(num_order: int, num_vehicles: int, power: f
 
 
 import matplotlib.pyplot as plt
+from matplotlib.ticker import AutoMinorLocator
 
-def plot_adaptive_local_configs(
-    num_vehicles_list=(5, 10, 20),
-    order_min=0,
-    order_max=200,
-    show_threshold=True,
-    save_path=None,
-    show_quadratic=False,
-    show_concave=False,
-    exp_powers=(2.0, 4.0, 6.0),
-):
+def plot_erfc_only(order_min=0,
+                   order_max=200,
+                   center=0.5,
+                   width=0.2,
+                   threshold_orders=80,
+                   num_vehicles=20,
+                   save_path=None,
+                   show_threshold=True,
+                   annotate=True,
+                   show_legend=True):
+    """Vẽ DUY NHẤT một đường ERFC ratio theo số lượng đơn hàng.
+
+    Parameters
+    ----------
+    order_min, order_max : khoảng số đơn.
+    center, width : tham số điều chỉnh vị trí và độ dốc của đường ERFC.
+    threshold_orders : ngưỡng để truyền vào AdaptiveRatioParams (dùng chuẩn hoá nếu cần).
+    num_vehicles : số xe (ảnh hưởng nếu hàm erfc có dùng).
+    save_path : nếu cung cấp, lưu hình ra file.
+    """
     orders = np.arange(order_min, order_max + 1)
-    plt.figure(figsize=(9, 5.2))
-    threshold_T = None
+    params = AdaptiveRatioParams(threshold_orders=threshold_orders, min_ratio=0.0, max_ratio=1.0)
+    erfc_vals = [compute_adaptive_ratio_erfc(o, num_vehicles, params, center=center, width=width)['ratio'] for o in orders]
 
-    for nv in num_vehicles_list:
-        ratios = []
-        for num_order in orders:
-            result = adaptive_local_configs(num_order, nv)
-            ratios.append(result['applied_ratio'])
-            if threshold_T is None:
-                threshold_T = result['threshold_T']
-        plt.plot(orders, ratios, label=f'Vehicles={nv}')
-        if show_quadratic:
-            for pw in exp_powers:
-                ratios_q = [adaptive_local_configs_quadratic(o, nv, power=pw)['applied_ratio'] for o in orders]
-                plt.plot(orders, ratios_q, linestyle='--', alpha=0.55, label=f'Exp(k={pw}) V={nv}')
+    plt.figure(figsize=(9, 5.2), dpi=140)
+    plt.plot(orders, erfc_vals, color='steelblue', linewidth=7.6,
+             label=f'ERFC μ={center}, σ={width}')
 
-    if show_threshold and threshold_T is not None:
-        plt.axvline(threshold_T, color='red', linestyle='--', alpha=0.7, label=f'Threshold T={threshold_T}')
+    ax = plt.gca()
+    # Improve ticks and add minor ticks for clearer grid
+    ax.tick_params(axis='both', labelsize=9, width=0.9, length=4)
+    ax.xaxis.set_minor_locator(AutoMinorLocator())
+    ax.yaxis.set_minor_locator(AutoMinorLocator())
+    ax.tick_params(axis='both', which='minor', length=2)
 
-    plt.xlabel('Number of Orders')
-    plt.ylabel('CROSSOVER_TYPE_RATIO')
-    plt.title('Adaptive CROSSOVER_TYPE_RATIO (KWW decay to 0 at threshold)')
+    # Optional threshold line
+    if show_threshold:
+        plt.axvline(threshold_orders, color='crimson', linestyle='--', alpha=0.9, linewidth=2.6,
+                     label=f'Threshold T={threshold_orders}')
+
+    if annotate:
+        # Derive an approximate center order (assuming center is normalized fraction of span)
+        center_order = int(order_min + center * (order_max - order_min))
+        # Clamp center_order within range
+        center_order = max(order_min, min(order_max, center_order))
+        center_ratio = erfc_vals[center_order - order_min]
+        # Annotate center point
+        """ plt.scatter([center_order], [center_ratio], color='orange', s=55, zorder=5)
+        plt.annotate(f'Center≈{center_order}\nRatio={center_ratio:.3f}',
+                     xy=(center_order, center_ratio),
+                     xytext=(center_order + 5, center_ratio + 0.05),
+                     arrowprops=dict(arrowstyle='->', color='orange'),
+                     fontsize=9, bbox=dict(boxstyle='round,pad=0.25', fc='white', alpha=0.7)) """
+
+        # Annotate start & end ratios
+        start_ratio = erfc_vals[0]
+        end_ratio = erfc_vals[-1]
+        """ plt.annotate(f'Start={start_ratio:.3f}',
+                     xy=(order_min, start_ratio),
+                     xytext=(order_min + 8, start_ratio + 0.08),
+                     arrowprops=dict(arrowstyle='->', color='gray'),
+                     fontsize=8, color='black', bbox=dict(boxstyle='round,pad=0.2', fc='white', alpha=0.6))
+        plt.annotate(f'End={end_ratio:.3f}',
+                     xy=(order_max, end_ratio),
+                     xytext=(order_max - 40, end_ratio + 0.08),
+                     arrowprops=dict(arrowstyle='->', color='gray'),
+                     fontsize=8, color='black', bbox=dict(boxstyle='round,pad=0.2', fc='white', alpha=0.6))
+
+        # Width note (sigma-like) near center
+        plt.annotate(f'Width σ={width}',
+                     xy=(center_order, center_ratio),
+                     xytext=(center_order - 25, center_ratio - 0.12),
+                     fontsize=8, color='dimgray') """
+    # Grid styling for clarity
+    ax.grid(True, which='major', linestyle='-', alpha=0.35, linewidth=0.8)
+    ax.grid(True, which='minor', linestyle=':', alpha=0.25, linewidth=0.6)
+    # Sharpen axes spines slightly
+    for spine in ax.spines.values():
+        spine.set_linewidth(0.9)
+
+    plt.xlabel('Number of Orders', fontsize=10)
+    plt.ylabel('CROSSOVER_TYPE_RATIO', fontsize=10)
+    plt.title('Adaptive CROSSOVER_TYPE_RATIO', fontsize=11)
     plt.ylim(-0.05, 1.05)
     plt.grid(True, alpha=0.3)
-    plt.legend()
+    if show_legend:
+        plt.legend(fontsize=9, frameon=True, framealpha=0.85, borderpad=0.6)
     plt.tight_layout()
     if save_path:
-        plt.savefig(save_path, dpi=150)
+        plt.savefig(save_path, dpi=180, bbox_inches='tight')
     plt.show()
 
 
 if __name__ == "__main__":
-    # Ví dụ: vẽ cho nhiều quy mô đội xe
-    plot_adaptive_local_configs(show_quadratic=True, show_concave=True)
+    # Vẽ ERFC với đường ngưỡng và chú thích
+    plot_erfc_only(order_min=0,
+                   order_max=100,
+                   center=0.5,
+                   width=0.2,
+                   threshold_orders=80,
+                   num_vehicles=20,
+                   save_path=None,
+                   show_threshold=True,
+                   annotate=False,
+                   show_legend=False)

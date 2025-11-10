@@ -16,11 +16,10 @@ from algorithm.Test_algorithm.adaptive_ratio import (
     compute_adaptive_ratio_erfc
 )
 
+def _copy_solution(sol: Dict[str, List[Node]]) -> Dict[str, List[Node]]:
+    return {vid: route[:] for vid, route in sol.items()}
 
-CROSSOVER_TYPE_RATIO = 0.0  # Global adaptive ratio between crossover (new_crossver2) and disturbance_opt
 def adaptive_local_configs(num_order: int, num_vehicles: int):
-    """Compute and assign global CROSSOVER_TYPE_RATIO using adaptive module."""
-    global CROSSOVER_TYPE_RATIO
     params = AdaptiveRatioParams(
         threshold_orders=80,
         kww_beta=3,
@@ -32,14 +31,15 @@ def adaptive_local_configs(num_order: int, num_vehicles: int):
         logistic_slope=10,
         early_shape=0.7,
     )
+    
     #info = compute_adaptive_ratio(num_orders=num_order, num_vehicles=num_vehicles, p=params)
     info = compute_adaptive_ratio_erfc(num_orders= num_order , num_vehicles=num_vehicles , p = params , center= 0.5 , width= 0.2)
-    CROSSOVER_TYPE_RATIO = info['ratio']
+    config.CROSSOVER_TYPE_RATIO = info['ratio']
     # Return full diagnostics for logging if needed by caller
     return info
 
 
-def GAVND_6(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tuple, Tuple], 
+def GAVND_7(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tuple, Tuple], 
             id_to_vehicle: Dict[str, Vehicle], Unongoing_super_nodes: Dict[int, Dict[str, Node]], 
             Base_vehicleid_to_plan: Dict[str, List[Node]]) -> Chromosome:
     
@@ -50,8 +50,7 @@ def GAVND_6(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
     except Exception as e:
         print(f"Adaptive config failed: {e}", file=sys.stderr)
     
-
-    population, PDG_map = new_generate_random_chromosome(initial_vehicleid_to_plan, route_map, id_to_vehicle, Unongoing_super_nodes, Base_vehicleid_to_plan, 1)
+    population, PDG_map = new_generate_random_chromosome(initial_vehicleid_to_plan, route_map, id_to_vehicle, Unongoing_super_nodes, Base_vehicleid_to_plan, config.POPULATION_SIZE)
     
     if population is None:
         print('Cant initialize the population')
@@ -60,7 +59,7 @@ def GAVND_6(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
     stagnant_generations = 0
     population.sort(key=lambda x: x.fitness)
     best_solution =  copy.deepcopy(population[0])
-    
+        
     begin_GA_time = time.time()
     for gen in range(config.NUMBER_OF_GENERATION):
         # Kiểm tra timeout
@@ -69,7 +68,6 @@ def GAVND_6(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
             elapsed_time = time.time() - config.BEGIN_TIME
             print(f"TimeOut!! Elapsed: {elapsed_time:.1f}s")
             break
-        
         
         # Tạo con (có giới hạn số lần thử để tránh vòng lặp vô hạn ở test nhỏ)
         target_size = config.POPULATION_SIZE * 2
@@ -85,9 +83,9 @@ def GAVND_6(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
                     population.append(candidate)
                 continue
             
-            if random.uniform(0 , 1) < CROSSOVER_TYPE_RATIO:
+            if random.uniform(0 , 1) < config.CROSSOVER_TYPE_RATIO:
                 child = new_crossver2(parent1, parent2, Base_vehicleid_to_plan, PDG_map)
-            else:
+            else:                
                 child = disturbance_opt(parent1.solution , id_to_vehicle , route_map , 0.5)
             
             if child is None:
@@ -104,7 +102,8 @@ def GAVND_6(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
             population.append(child)
         
         population.sort(key= lambda x: x.fitness)
-        population : List[Chromosome] = population[:config.POPULATION_SIZE]
+        new_populution : List[Chromosome] = population[:config.POPULATION_SIZE]
+        population = new_populution
         
         if config.is_timeout():
             break
@@ -117,7 +116,7 @@ def GAVND_6(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
         for c in range (len(population)):
             if mutate_count > int(len(population) * config.MUTATION_RATE):
                 break            
-            randon_1_LS(population[c] , True , 1)
+            randon_1_LS(population[c] , PDG_map , True , 1)
             mutate_count +=1
         
         population.sort(key=lambda x: x.fitness)
@@ -125,8 +124,9 @@ def GAVND_6(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
         
         
         # Cập nhật best solution
-        if best_solution is None or population[0].fitness < best_solution.fitness:
-            best_solution = copy.deepcopy(population[0])
+        if best_solution is None or population[0].fitness < int(best_solution.fitness):
+            new_best_solution = _copy_solution(population[0].solution)
+            best_solution = Chromosome(new_best_solution , route_map , id_to_vehicle)
             stagnant_generations = 0
         else:
             stagnant_generations += 1
@@ -134,29 +134,23 @@ def GAVND_6(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
         avg = sum(c.fitness for c in population) / len(population)
         
         print(f'Generation {gen+1}: Best = {population[0].fitness:.2f}, '
-              f'Worst = {population[-1].fitness:.2f}, '
-              f'Avg = {avg:.2f}, '
-              f'Time: {time.time() - begin_gen_time}')
+                f'Worst = {population[-1].fitness:.2f}, '
+                f'Avg = {avg:.2f}, '
+                f'Time: {time.time() - begin_gen_time}')
 
         # Điều kiện dừng
         #  
-        if stagnant_generations >= 5 or avg == population[0].fitness:
+        if stagnant_generations >= 4 or avg == population[0].fitness :
             print("Stopping early due to lack of improvement.")
             break
-
-        # Time check - Điều chỉnh
+        
         gen_end_time = time.time()
         
-        # Tính tổng thời gian đã sử dụng
         elapsed_time = gen_end_time - config.BEGIN_TIME
-        
-        # Ước tính thời gian cần cho generation tiếp theo
-        avg_gen_time = elapsed_time / (gen + 1)
-        estimated_next_gen_time = avg_gen_time
         
         # Kiểm tra timeout
         if elapsed_time  > config.ALGO_TIME_LIMIT:
-            print(f"TimeOut!! Elapsed: {elapsed_time:.1f}s, Estimated next gen: {estimated_next_gen_time:.1f}s")
+            print(f"TimeOut!! Elapsed: {elapsed_time:.1f}s")
             break
     final_time = time.time()
     total_runtime = final_time - config.BEGIN_TIME
@@ -167,15 +161,22 @@ def GAVND_6(initial_vehicleid_to_plan: Dict[str, List[Node]], route_map: Dict[Tu
     # Giai doan 2
     unique_population = remove_similar_individuals(population, threshold=0.0)
     unique_population.sort(key=lambda x: x.fitness)
+    print(len(unique_population))
     
+    unique_population = [ini for ini in unique_population if ini.fitness < best_solution.fitness  + config.addDelta]
+    print(len(unique_population))
     
     mutate_count = 0
-    for c in range (len(unique_population)):
+    while not config.is_timeout():
+        
         if mutate_count > int(len(population) * config.MUTATION_RATE) or mutate_count >= len(unique_population):
             break
         
-        adaptive_LS_stategy(unique_population[c] , False , 1)
-        mutate_count +=1
+        if unique_population[mutate_count % len(unique_population)].fitness > unique_population[0].fitness + config.addDelta: break
+        
+        adaptive_LS_stategy(unique_population[mutate_count] , PDG_map , False )
+        
+        mutate_count += 1
     
     unique_population.sort(key=lambda x: x.fitness)
     if unique_population[0].fitness < best_solution.fitness: config.IMPROVED_IN_DIVER += 1
@@ -211,25 +212,25 @@ def select_parents(population: List[Chromosome]) -> Tuple[Chromosome, Chromosome
     return p1, p2
 
 
-def adaptive_LS_stategy(indivisual: Chromosome, is_limited=True , mode = 1 ):
+def adaptive_LS_stategy(indivisual: Chromosome, PDG_map : Dict[str , List[Node]],  is_limited=True ):
     if config.is_timeout():
         return False
     
-    i = 1
+    i = 0
     
     # Dictionary các phương pháp Local Search
     methods = {
         'PDPairExchange': lambda: new_inter_couple_exchange(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, math.inf,  is_limited),
         'BlockExchange': lambda: new_block_exchange(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, math.inf, is_limited),
         'BlockRelocate': lambda: new_block_relocate(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, math.inf, is_limited),
-        'mPDG': lambda: new_multi_pd_group_relocate(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, math.inf, is_limited)
+        'mPDG': lambda: new_multi_pd_group_relocate(indivisual.solution, indivisual.id_to_vehicle, indivisual.route_map, math.inf, is_limited),
     }
     
     # Counter cho từng phương pháp
     counters = {name: 0 for name in methods}
     
     # Lấy thứ tự adaptive
-    method_names = get_adaptive_order(indivisual , methods , mode=mode)
+    method_names = get_adaptive_order(indivisual , methods )
     
     #  Track local search timings per method
     ls_timings = {
@@ -240,8 +241,7 @@ def adaptive_LS_stategy(indivisual: Chromosome, is_limited=True , mode = 1 ):
     }
 
     # Best snapshot latch to ensure we commit the best solution found during LS
-    def _copy_solution(sol: Dict[str, List[Node]]) -> Dict[str, List[Node]]:
-        return {vid: route[:] for vid, route in sol.items()}
+    
     best_cost = total_cost(indivisual.id_to_vehicle, indivisual.route_map, indivisual.solution)
     best_snapshot = _copy_solution(indivisual.solution)
     
