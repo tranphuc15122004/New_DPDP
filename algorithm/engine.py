@@ -738,50 +738,82 @@ def dispatch_nodePair(node_list: list[Node]  , id_to_vehicle: Dict[str , Vehicle
     #print(f"Best cost {minCostDelta}" , , file = sys.stderr)
     return isExhausive , bestInsertVehicleID, bestInsertPosI, bestInsertPosJ , bestNodeList
 
-def random_dispatch_nodePair(node_list: list[Node]  , id_to_vehicle: Dict[str , Vehicle] , vehicleid_to_plan: Dict[str, list[Node]]):
+
+def random_dispatch_nodePair(node_list: list[Node], id_to_vehicle: Dict[str, Vehicle], vehicleid_to_plan: Dict[str, list[Node]]):
+    """
+    Randomly insert a pickup-delivery pair into a vehicle route without:
+    - losing nodes,
+    - duplicating nodes,
+    - or altering the destination position (index 0) for vehicles that have a current destination.
+    """
+    if not node_list or len(node_list) < 2:
+        return
+
     is_inserted = False
-    while (is_inserted == False):
+    while not is_inserted:
         selected_vehicleID = random.choice(list(id_to_vehicle.keys()))
-        
         selected_vehicle = id_to_vehicle[selected_vehicleID]
-        begin_pos = 1 if selected_vehicle.des else 0
+
+        # Ensure the plan list exists
+        route = vehicleid_to_plan.get(selected_vehicleID)
+        if route is None:
+            route = []
+            vehicleid_to_plan[selected_vehicleID] = route
+
+        begin_pos = 1 if selected_vehicle.des else 0  # never insert before index 0 if a destination exists
         check_end = False
-        old_len = len(vehicleid_to_plan[selected_vehicleID])
+        old_len = len(route)
+
+        # If route is empty but vehicle currently has a destination, put that destination at index 0 first
+        if old_len == 0 and selected_vehicle.des is not None:
+            route.append(selected_vehicle.des)
+            old_len = 1  # destination preserved at index 0
+
+        pickup_node = node_list[0]
+        delivery_node = node_list[-1]
+
         if old_len == 0:
-            vehicleid_to_plan[selected_vehicleID].extend(node_list)
-            is_inserted = True
+            # No destination and no existing route -> simply append pair (feasibility-checked)
+            route.extend([pickup_node, delivery_node])
+            carrying_items = selected_vehicle.carrying_items if selected_vehicle.des else []
+            if isFeasible(route, carrying_items, selected_vehicle.board_capacity):
+                is_inserted = True
+            else:
+                # revert and retry with another vehicle
+                route.pop(); route.pop()
         else:
-            pickup_node = node_list[0]
-            delivery_node = node_list[-1]
-            
-            # chen cac cap node vao ngau nhien trong cac xe
-            # chen node nhan truoc                        
-            feasible_position1 = [i for i in range(begin_pos , len(vehicleid_to_plan[selected_vehicleID]) + 1)]
+            # Try random feasible positions for pickup and delivery (delivery strictly after pickup)
+            feasible_position1 = [i for i in range(begin_pos, len(route) + 1)]
             random.shuffle(feasible_position1)
             for insert_posI in feasible_position1:
-                feasible_position2 = [i for i in range(insert_posI +1, len(vehicleid_to_plan[selected_vehicleID]) + 2)]
-                
-                # dao vi tri tren node giao
+                feasible_position2 = [i for i in range(insert_posI + 1, len(route) + 2)]
                 random.shuffle(feasible_position2)
-                
                 for insert_posJ in feasible_position2:
-                    vehicleid_to_plan[selected_vehicleID].insert(insert_posI , pickup_node)
-                    vehicleid_to_plan[selected_vehicleID].insert(insert_posJ , delivery_node)
-                    
+                    route.insert(insert_posI, pickup_node)
+                    route.insert(insert_posJ, delivery_node)
+
+                    # Do not allow changing destination position at index 0
+                    if selected_vehicle.des and route and route[0].id != selected_vehicle.des.id:
+                        # revert immediately if destination got shifted
+                        route.pop(insert_posJ)
+                        route.pop(insert_posI)
+                        continue
+
                     carrying_items = selected_vehicle.carrying_items if selected_vehicle.des else []
-                    if (isFeasible(vehicleid_to_plan[selected_vehicleID] , carrying_items ,  selected_vehicle.board_capacity)):
-                        check_end  = True
+                    if isFeasible(route, carrying_items, selected_vehicle.board_capacity):
+                        check_end = True
                         break
-                    
-                    vehicleid_to_plan[selected_vehicleID].pop(insert_posJ)
-                    vehicleid_to_plan[selected_vehicleID].pop(insert_posI)
-                
+
+                    # Revert failed attempt
+                    route.pop(insert_posJ)
+                    route.pop(insert_posI)
                 if check_end:
                     break
-        
-        #kiem tra xem cap node da duojc chen chua
-        if len(vehicleid_to_plan[selected_vehicleID]) == old_len + 2 :
-            is_inserted = True
+
+        # Confirm exactly two nodes were added and, if applicable, destination preserved
+        if len(route) == old_len + 2:
+            if not selected_vehicle.des or (route and route[0].id == selected_vehicle.des.id):
+                is_inserted = True
 
 
 def isFeasible(route_node_list : List[Node] , carrying_items : List[OrderItem] , capacity : float ):
